@@ -1,0 +1,12 @@
+{
+  "id": "memory-graph",
+  "name": "Memory Graph",
+  "scripts": ["memory-nav.js"],
+  "stylesheets": ["memory-nav.css"],
+  "sidecar": {
+    "type": "loopback",
+    "origin": "http://127.0.0.1:8792",
+    "health_path": "/health",
+    "proxy_auth": "token-v1"
+  }
+}
