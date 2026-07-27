@@ -3,119 +3,353 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
   <title>Memory</title>
   <!--
-    THESIS: The agent has learned 104 things and the existing Memory screen shows
-      none of them — it renders three markdown files. This surface answers what
-      the agent actually knows, what those things are about, and which of them
-      are load-bearing. Nothing else earns space.
-    OWN-WORLD: Same control room as the Capability Router console, deliberately:
-      an operator should not learn two visual languages for one agent. Colour
-      means state and nothing else; structure comes from hairlines and space.
-    STORY: The constellation first — you see the shape of the knowledge and its
-      clusters. Click a node and it becomes the subject: its content, its trust,
-      what it is about, what it connects to and why. Search narrows the
-      constellation rather than replacing it with a list.
-    FIRST VIEWPORT: The graph, at full width, already drawn. No empty canvas
-      waiting for a click, no legend explaining the legend.
-    FORM: Single self-contained file. Force layout and rendering are hand-written
-      over SVG — a chart library would be more code than the ~200 lines this
-      needs, and none of it inspectable.
+    THESIS: The agent has learned 104 things. This surface answers three
+      operator questions and nothing else: WHAT does it know, WHY is a given
+      thing trusted, and WHAT can it not reach. Everything on screen serves one
+      of those three or is cut.
+
+    WHY A LIST LEADS AND THE GRAPH IS A MODE — decided from the live store, not
+    from taste. Measured against /graph on 2026-07-26 (104 facts, 357 topics,
+    857 shares, 5 with no topic):
+      * 275 of the 357 topics carry exactly ONE fact. As nodes those are
+        diamonds with a single edge: they cannot express a relationship, and
+        they are 59.7% of the 461 nodes the old default drew. Most of the canvas
+        was texture.
+      * The fact-to-fact graph is not sparse. 857 edges over 104 facts is a mean
+        degree of 16.5 and 16.0% of all 5356 possible pairs. A force layout of a
+        16%-dense graph converges to one blob — which is exactly what the old
+        first viewport showed. There are no clusters to see because there are no
+        clusters.
+      * The edges are dominated by one word. "Hermes" is 406 of the 1109 `via`
+        mentions (36.6%), and 350 of the 857 edges (41%) have "Hermes" as their
+        ONLY evidence. So ranking facts by edge count ranked them by how often a
+        near-universal token appears, and called it "most connected".
+      Conclusion: at this store's shape the graph cannot answer any of the three
+      questions, so it does not get the first viewport. The list does. The graph
+      stays — as a MODE — because it is the only view that shows a fact's
+      neighbourhood at a glance, and because at a different store shape (sparser,
+      more topics with 2+ facts) it would earn the default back.
+
+    WHAT THE GRAPH MODE FIXES: it now draws only the 82 topics that link two or
+      more facts, so 186 nodes instead of 461, and says so. Showing all 357 is
+      one click away and labelled with its own count.
+
+    OBJECTIVITY: every number on screen is a field of /graph or is counted from
+      one. Trust is never a bare decimal — it is placed against the two constants
+      that give it meaning (the store's 0.50 default, the 0.30 recall floor,
+      both read from the running deploy). Usage says what the counter counts.
+      Search always states its match count and names a zero result.
+
+    NATIVE: no wordmark. The header is the host's own .main-view-header shape
+      (18px/600 sans title, actions right) and every colour is a host token
+      forwarded by hermes-theme-bridge.js — see the token block below.
+
+    FORM: single self-contained file, no dependencies. Force layout and SVG
+      rendering are hand-written; a chart library would be more code than this
+      needs and none of it inspectable.
   -->
   <style>
+    /* ── the theme, inherited ──────────────────────────────────────────────
+       NOT A PALETTE. Every token reads a --host-* custom property that
+       hermes-theme-bridge.js writes onto this frame's documentElement from the
+       running shell's resolved theme, and re-writes when the skin or the
+       light/dark axis changes. The value after the comma is a FALLBACK — what
+       this console looks like if the bridge is absent — and those fallbacks are
+       the palette this console used to hard-code, so the worst case is the
+       previous design rather than an unstyled page.
+
+       The reason is measured: the host ships 21 skins x light/dark. default/dark
+       is navy #0D0D1A on cream #FFF8DC with a gold accent; catppuccin/light is
+       #EFF1F5 with a purple one. Hard-coding #0a0a0c made this console a black
+       rectangle inside a parchment shell in every light skin — screenshotted.
+       Mapping and derivation rules are the same as hermes-shared/hermes-panel.css;
+       this file inlines them because a srcdoc document inherits no host CSS. */
     :root {
-      --bg: #0a0a0c;
-      --surface: #101013;
-      --surface-raised: #15151a;
-      --surface-hover: #1c1c23;
-      --line: #212127;
-      --line-strong: #33333d;
-      --text: #f3f3f6;
-      --muted: #9a9aa8;
-      --faint: #61616e;
-      --accent: #f3f3f6;
-      --green: #4ade9b;
-      --amber: #f7b955;
-      --red: #ff6b7d;
-      --violet: #b490ff;
-      --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --t-label: 10.5px;
-      --t-body: 13px;
+      --bg: var(--host-bg, #0a0a0c);
+      --surface: var(--host-surface, #101013);
+      --surface-raised: var(--host-surface-subtle, #15151a);
+      --surface-hover: var(--host-hover-bg, #1c1c23);
+      --line: var(--host-border, #212127);
+      --line-strong: var(--host-border2, #33333d);
+
+      /* Two text steps, because the host declares exactly two. A third, fainter
+         step was measured at 2.31:1 in the worst skin against a 3:1 floor, so the
+         step below --muted is made in TYPE (11px tracked uppercase) and never in
+         contrast. --faint is therefore --muted deliberately. */
+      --text: var(--host-text, #f3f3f6);
+      --muted: var(--host-muted, #9a9aa8);
+      --faint: var(--host-muted, #61616e);
+
+      --accent: var(--host-accent, #f3f3f6);
+      --accent-text: var(--host-accent-text, var(--host-accent, #f3f3f6));
+      --accent-bg: var(--host-accent-bg, transparent);
+      --accent-bg-strong: var(--host-accent-bg-strong, transparent);
+      --accent-fg: var(--host-accent-fg, #fff);
+
+      --ok: var(--host-success, #4ade9b);
+      --warn: var(--host-warning, #f7b955);
+      --bad: var(--host-error, #ff6b7d);
+      --info: var(--host-info, #b490ff);
+      --ok-bg: transparent;
+      --warn-bg: transparent;
+      --bad-bg: transparent;
+      --info-bg: transparent;
+      --bad-text: var(--host-error, #ff6b7d);
+
+      --mono: var(--host-font-mono, ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace);
+      --sans: var(--host-font-ui, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+
+      /* The host's ladder, not a parallel one: 11px metadata, 12px labels, 14px
+         body, 16-18px headings. The old 10.5px/13px/20px steps read as an
+         accident beside host chrome. */
+      --t-label: var(--host-font-size-xs, 11px);
+      --t-meta: var(--host-font-size-sm, 12px);
+      --t-body: var(--host-font-size-md, 14px);
       --t-value: 16px;
-      --t-head: 20px;
-      --focus: 0 0 0 3px rgba(243, 243, 246, .22);
-      --radius: 7px;        /* the shared pair — see hermes-panel.css */
-      --radius-input: 9px;
+      --t-head: 18px;
+
+      --radius-sm: var(--host-radius-sm, 4px);
+      --radius: var(--host-radius-md, 8px);
+      --radius-input: var(--host-radius-md, 8px);
+      --radius-pill: var(--host-radius-pill, 999px);
+      --focus: 0 0 0 3px var(--host-focus-ring, rgba(243, 243, 246, .22));
+
+      --ease: cubic-bezier(.16, 1, .3, 1);
+      --enter: 160ms;
+
+      /* The shell's own polarity, so scrollbars and form controls are right
+         before any of our CSS paints. The host carries this as a CLASS on
+         <html>, never a property, so the bridge resolves it for us. */
+      color-scheme: var(--host-color-scheme, dark);
+    }
+    /* Separate @supports, not a declare-twice fallback: a custom property accepts
+       any token stream at parse time, so an engine without color-mix would keep
+       the declaration and fail later at computed-value time. */
+    @supports (color: color-mix(in srgb, red 50%, blue)) {
+      :root {
+        --ok-bg: color-mix(in srgb, var(--host-success, #4ade9b) 14%, transparent);
+        --warn-bg: color-mix(in srgb, var(--host-warning, #f7b955) 14%, transparent);
+        --bad-bg: color-mix(in srgb, var(--host-error, #ff6b7d) 14%, transparent);
+        --info-bg: color-mix(in srgb, var(--host-info, #b490ff) 14%, transparent);
+        /* --host-error is authored for a filled badge and measures 4.01:1 against
+           --bg at worst. Pulled 22% toward --text it clears 5.16:1 everywhere. */
+        --bad-text: color-mix(in srgb, var(--host-error, #ff6b7d) 78%, var(--host-text, #f3f3f6));
+      }
     }
 
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body {
       margin: 0; color: var(--text); background: var(--bg);
-      font: var(--t-body)/1.5 var(--sans);
-      -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+      font: var(--t-body)/1.55 var(--sans);
+      -webkit-font-smoothing: antialiased;
     }
-    button, input { font: inherit; color: inherit; }
+    button, input, select { font: inherit; color: inherit; }
     button { cursor: pointer; }
     :focus-visible { outline: none; box-shadow: var(--focus); }
-    h2 { margin: 0; font: 600 var(--t-head)/1.25 var(--sans); letter-spacing: -.015em; }
     p { margin: 0; }
     [hidden] { display: none !important; }
+    .num { font-variant-numeric: tabular-nums; }
 
-    .shell { display: flex; flex-direction: column; height: 100%; }
+    .shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
-    /* ── Masthead ──────────────────────────────────────────────────── */
+    /* ── header ────────────────────────────────────────────────────────────
+       The host's own view header, measured off the running shell:
+       .main-view-header is padding 8px 32px with a 1px bottom border on
+       --border and min-height 41px; .main-view-title is 18px / 600 /
+       letter-spacing -.01em in the UI SANS. Not a tracked mono wordmark, and
+       not the product's name — the rail already says which surface this is, so
+       the header carries the view's title and its actions. */
+    .head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-shrink: 0;
+      min-height: 41px; padding: 8px clamp(16px, 2.4vw, 32px);
+      border-bottom: 1px solid var(--line); background: var(--bg);
+    }
+    .head-title {
+      margin: 0; min-width: 0;
+      font: 600 var(--t-head)/1.3 var(--sans); letter-spacing: -.01em;
+      color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+    /* Mode switch: two quiet buttons, the active one marked the way the host
+       marks an active nav tab — accent text over an accent wash, no shadow, no
+       transform. */
+    .modes { display: inline-flex; gap: 2px; }
+    .mode {
+      border: 1px solid transparent; border-radius: var(--radius-sm);
+      padding: 5px 11px; background: none; color: var(--muted);
+      font: 500 var(--t-meta) var(--sans);
+    }
+    .mode:hover { color: var(--text); background: var(--surface-hover); }
+    .mode[aria-selected="true"] {
+      color: var(--accent-text); background: var(--accent-bg);
+      border-color: var(--accent-bg-strong);
+    }
+
+    /* ── filter bar ────────────────────────────────────────────────────────
+       Search, then the scopes, then the tally. The tally is not decoration: the
+       old search reported nothing, so an operator could not tell "no match" from
+       "the filter did not run". */
     .bar {
-      display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
-      align-items: center; gap: 10px 20px;
-      padding: 11px clamp(16px, 2.4vw, 28px);
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+      flex-shrink: 0;
+      padding: 10px clamp(16px, 2.4vw, 32px);
       border-bottom: 1px solid var(--line);
     }
-    @media (max-width: 760px) {
-      .bar { grid-template-columns: auto minmax(0, 1fr); }
-      .search { grid-column: 1 / -1; grid-row: 2; max-width: none; }
-    }
-    .brand { display: flex; align-items: baseline; gap: 9px; }
-    .brand-name { font: 600 var(--t-label) var(--mono); letter-spacing: .18em; text-transform: uppercase; }
-    /* Same wordmark form as the router console and the office: the surface at
-       full contrast, the product faint beside it. */
-    .brand-host { color: var(--faint); font: var(--t-label)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
-    @media (max-width: 560px) { .brand-host { display: none; } }
     .search {
-      width: 100%; max-width: 420px; padding: 6px 12px;
-      border: 1px solid var(--line); border-radius: var(--radius-input);
-      background: var(--surface); font: var(--t-body) var(--mono);
+      flex: 1 1 240px; min-width: 0; max-width: 380px;
+      padding: 6px 10px;
+      border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+      background: var(--host-input-bg, var(--surface));
+      color: var(--text); font: var(--t-meta) var(--sans);
     }
-    .search::placeholder { color: var(--faint); }
-    .facts { display: flex; gap: 18px; align-items: baseline; }
-    .fact { display: flex; flex-direction: column; }
-    .fact-label { color: var(--faint); font: var(--t-label) var(--mono); letter-spacing: .13em; text-transform: uppercase; }
-    .fact-value { font: 500 var(--t-value) var(--mono); }
+    .search::placeholder { color: var(--muted); }
+    .search:focus { border-color: var(--accent); }
+    .scopes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .scope {
+      padding: 4px 10px; border: 1px solid var(--line-strong);
+      border-radius: var(--radius-pill); background: transparent;
+      color: var(--muted); font: 500 var(--t-label) var(--sans);
+      white-space: nowrap;
+    }
+    .scope:hover { color: var(--text); border-color: var(--muted); }
+    .scope[aria-pressed="true"] {
+      color: var(--accent-text); background: var(--accent-bg);
+      border-color: var(--accent-bg-strong); font-weight: 600;
+    }
+    .scope .num { margin-left: 5px; color: inherit; opacity: .75; font-family: var(--mono); }
+    .tally { margin-left: auto; color: var(--muted); font-size: var(--t-meta); white-space: nowrap; }
+    .sort {
+      padding: 5px 8px; border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm); background: var(--surface);
+      color: var(--muted); font: var(--t-meta) var(--sans);
+    }
+    .sort:hover { color: var(--text); }
 
-    /* ── Stage ─────────────────────────────────────────────────────── */
-    .stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 0; flex: 1; }
-    @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+    /* A condition worth an operator's attention is a line with a state dot, not
+       a tinted card with a coloured edge. Here it is also a BUTTON, because the
+       5 facts it names used to be un-reachable: the notice stated them and then
+       left the operator with nowhere to go. */
+    .note {
+      display: flex; gap: 10px; align-items: baseline; width: 100%;
+      margin: 0; padding: 10px clamp(16px, 2.4vw, 32px);
+      border: 0; border-bottom: 1px solid var(--line);
+      background: none; text-align: left;
+      color: var(--muted); font-size: var(--t-meta);
+    }
+    button.note:hover { background: var(--surface-hover); color: var(--text); }
+    .note::before {
+      content: ""; flex: 0 0 auto; width: 6px; height: 6px; margin-top: 6px;
+      border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg);
+    }
+    .note strong { color: var(--text); font-weight: 600; }
+    .note.is-bad::before { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-bg); }
+    .note-go { color: var(--accent-text); font-weight: 600; white-space: nowrap; }
+
+    /* ── stage ─────────────────────────────────────────────────────────────
+       Two panes: the subject list (or the canvas) and the inspector. */
+    .stage { display: grid; grid-template-columns: minmax(0, 1fr) 384px; min-height: 0; flex: 1; }
+    @media (max-width: 1100px) { .stage { grid-template-columns: minmax(0, 1fr) 330px; } }
+    @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; } }
+    /* On a phone the two panes stack, and a canvas only as tall as its share of
+       a 1fr row is unreadable — so the graph takes a fixed slice and the
+       inspector scrolls under it. dvh not vh: vh measures the viewport as if the
+       browser chrome were absent, which makes the canvas taller than its space
+       and pushes the zoom buttons under the address bar. */
+    @media (max-width: 640px) {
+      /* The split follows the task, because an even one serves neither. Measured
+         at 390x844: the frame is 791px tall, so 50/50 gave the list 263px — two
+         facts of a 104-fact list — while the inspector used its half to show a
+         four-line summary. So: scanning gets the room until there is something to
+         read, and then reading does. Both panes stay scrollable either way, so
+         nothing is ever hidden by the weighting. */
+      .stage { grid-template-rows: 62dvh minmax(0, 1fr); }
+      .stage.has-subject { grid-template-rows: 34dvh minmax(0, 1fr); }
+      .stage.is-graph { grid-template-rows: 46dvh minmax(0, 1fr); }
+      .canvas { min-height: 0; }
+    }
+    .pane { min-height: 0; overflow: auto; }
+
+    /* ── the list ──────────────────────────────────────────────────────────
+       Rows separated by hairlines, never boxed and never nested. One row is one
+       fact: what it says, then its machine metadata at the step below. */
+    .rows { padding: 4px clamp(16px, 2.4vw, 32px) 28px; }
+    .row {
+      display: block; width: 100%; padding: 11px 0;
+      border: 0; border-bottom: 1px solid var(--line);
+      background: none; text-align: left; color: inherit;
+    }
+    .row:last-child { border-bottom: 0; }
+    .row:hover { background: var(--surface-hover); }
+    .row[aria-current="true"] { background: var(--accent-bg); }
+    .row-line {
+      display: block; color: var(--text); font-size: var(--t-body);
+      overflow-wrap: anywhere;
+      /* Two lines, then ellipsis: the median fact is 369 characters and the
+         longest 982, so an unclamped row buries the next fact off screen. */
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .row-meta {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+      margin-top: 5px; color: var(--muted); font: var(--t-label) var(--mono);
+    }
+    .row-meta .sans { font-family: var(--sans); }
+    .dot {
+      display: inline-block; width: 6px; height: 6px; margin-right: 5px;
+      border-radius: 50%; background: var(--muted); vertical-align: baseline;
+    }
+    /* Trust is the one thing on this screen worth a colour, and the four bands
+       are the store's own thresholds rather than invented thirds — see
+       trustBand() for the constants and where they were read from. */
+    .t-floor   .dot, .dot.t-floor   { background: var(--bad);  box-shadow: 0 0 0 3px var(--bad-bg); }
+    .t-low     .dot, .dot.t-low     { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg); }
+    .t-default .dot, .dot.t-default { background: var(--muted); }
+    .t-high    .dot, .dot.t-high    { background: var(--ok);   box-shadow: 0 0 0 3px var(--ok-bg); }
+
+    .empty { padding: 28px clamp(16px, 2.4vw, 32px); max-width: 46ch; }
+    .empty-title { font: 600 var(--t-value)/1.4 var(--sans); color: var(--text); }
+    .empty-sub { margin-top: 6px; color: var(--muted); font-size: var(--t-meta); }
+    .empty-act { margin-top: 14px; }
+    .btn {
+      padding: 6px 12px; border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm); background: transparent;
+      color: var(--text); font: 500 var(--t-meta) var(--sans);
+    }
+    .btn:hover { border-color: var(--accent); background: var(--surface-raised); }
+
+    /* ── the canvas ────────────────────────────────────────────────────────*/
     .canvas { position: relative; min-height: 0; overflow: hidden; }
-    #graph { display: block; width: 100%; height: 100%; cursor: grab; }
+    #graph {
+      display: block; width: 100%; height: 100%; cursor: grab;
+      /* The browser decides what a drag means BEFORE any listener runs. Without
+         this, a finger dragged across the graph scrolled the page and the graph
+         never moved — the pointer handlers were correct and still could not work.
+         none, not pan-x/pan-y: both axes belong to the graph, and pinch-zoom is
+         handled explicitly so the browser's own must not fight it. */
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
     #graph.dragging { cursor: grabbing; }
 
-    /* Nodes: a fact is a disc sized by how connected it is, an entity is a
-       diamond. Shape carries kind so colour stays free to carry state. */
+    /* A fact is a disc, a topic a diamond: shape carries kind so colour stays
+       free to carry state, and there is nothing to look up in a legend. */
     .node { cursor: pointer; }
-    .n-fact { fill: #2a2a34; stroke: var(--line-strong); stroke-width: 1; }
-    .n-entity { fill: none; stroke: var(--violet); stroke-width: 1.2; }
+    .n-fact { fill: var(--surface-hover); stroke: var(--line-strong); stroke-width: 1; }
+    .n-entity { fill: none; stroke: var(--muted); stroke-width: 1.2; }
     .node:hover .n-fact { stroke: var(--accent); }
     .node.on .n-fact { fill: var(--accent); stroke: var(--accent); }
     .node.on .n-entity { stroke: var(--accent); stroke-width: 2; }
     .node.near .n-fact { stroke: var(--accent); stroke-width: 1.6; }
     .node.dim { opacity: .18; }
-    /* Trust is the one thing worth colouring: a fact the agent half-believes
-       should not look identical to one it is sure of. */
-    .node.t-low .n-fact { fill: #3a2b30; stroke: var(--red); }
-    .node.t-mid .n-fact { fill: #34302a; stroke: var(--amber); }
-    .node.t-high .n-fact { stroke: var(--green); }
+    .node.t-floor .n-fact { stroke: var(--bad); }
+    .node.t-low   .n-fact { stroke: var(--warn); }
+    .node.t-high  .n-fact { stroke: var(--ok); }
     .n-label {
       fill: var(--muted); font: var(--t-label) var(--mono); pointer-events: none;
       paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round;
@@ -126,80 +360,189 @@
     .edge.on { stroke: var(--accent); opacity: 1; }
     .edge.dim { opacity: .07; }
 
-    .hint {
-      position: absolute; left: 16px; bottom: 14px;
-      color: var(--faint); font: var(--t-label) var(--mono); letter-spacing: .04em;
+    .overlay {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 12px; padding: 12px 14px; pointer-events: none;
     }
-    .zoom { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 6px; }
+    .overlay > * { pointer-events: auto; }
+    /* The legend sits ON the canvas, so it is backed by the page colour rather
+       than left to fight the nodes behind it. Read off the 390px screenshot: over
+       the graph's own discs and edges the unbacked text was not readable, which
+       makes the one place that declares what is hidden the least legible thing on
+       screen. A flat --bg plate, not a blur: this is legibility, not decoration. */
+    .legend {
+      color: var(--muted); font-size: var(--t-label); max-width: 62%;
+      padding: 6px 8px; border-radius: var(--radius-sm);
+      background: var(--bg);
+    }
+    .legend p + p { margin-top: 3px; }
+    .legend .hint { color: var(--muted); font-family: var(--mono); }
+    /* On a phone the canvas is ~364px tall and the legend's three lines wrap to
+       five, eating a third of it. The counts and the gesture stay; the sentence
+       explaining WHY single-fact topics are hidden is the desktop's to carry,
+       and the count itself never leaves. */
+    @media (max-width: 640px) {
+      .legend { max-width: none; font-size: var(--t-label); }
+      .legend .why { display: none; }
+    }
+    .zoom { display: flex; gap: 6px; }
     .zoom button {
-      width: 26px; height: 26px; border: 1px solid var(--line-strong); border-radius: var(--radius);
-      background: var(--surface); color: var(--muted); line-height: 1;
+      width: 28px; height: 28px; border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm); background: var(--surface);
+      color: var(--muted); line-height: 1; font-size: var(--t-meta);
     }
     .zoom button:hover { color: var(--text); border-color: var(--accent); }
+    .scope-graph {
+      border: 1px solid var(--line-strong); border-radius: var(--radius-pill);
+      padding: 4px 10px; background: var(--surface);
+      color: var(--muted); font: 500 var(--t-label) var(--sans);
+    }
+    .scope-graph:hover { color: var(--text); border-color: var(--accent); }
 
-    /* ── Inspector ─────────────────────────────────────────────────── */
+    /* ── inspector ─────────────────────────────────────────────────────────*/
     .side {
-      border-left: 1px solid var(--line); padding: 20px clamp(14px, 1.6vw, 20px);
+      border-left: 1px solid var(--line);
+      padding: 20px clamp(16px, 1.8vw, 24px) 32px;
       overflow: auto; min-height: 0;
     }
     @media (max-width: 900px) { .side { border-left: 0; border-top: 1px solid var(--line); } }
-    .subject { font: 500 var(--t-value)/1.45 var(--sans); overflow-wrap: anywhere; }
-    .meta { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 14px; }
     .kicker {
-      color: var(--faint); font: 600 var(--t-label) var(--mono);
-      letter-spacing: .16em; text-transform: uppercase;
+      display: block; color: var(--faint);
+      font: 600 var(--t-label) var(--mono); letter-spacing: .14em; text-transform: uppercase;
     }
-    .group { margin-top: 26px; }
-    .group > .kicker { display: block; padding-bottom: 7px; border-bottom: 1px solid var(--line); }
+    /* More space above a heading than below it. */
+    .group { margin-top: 30px; }
+    .group > .kicker { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .subject { margin-top: 10px; font: var(--t-value)/1.5 var(--sans); overflow-wrap: anywhere; }
+    .lede { margin-top: 8px; color: var(--muted); font-size: var(--t-meta); }
+    .prose { margin-top: 8px; color: var(--muted); font-size: var(--t-meta); }
+    .prose strong { color: var(--text); font-weight: 600; }
+
+    /* Trust, with the scale it is measured on. A bare "0.95" says nothing; the
+       ticks are the store's own default and its retrieval floor. */
+    .gauge { margin-top: 12px; }
+    .gauge-top {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    }
+    .gauge-value { font: 500 var(--t-value) var(--mono); color: var(--text); }
+    .gauge-of { color: var(--muted); font: var(--t-label) var(--mono); }
+    .gauge-track {
+      position: relative; height: 4px; margin-top: 8px;
+      border-radius: 2px; background: var(--line);
+    }
+    .gauge-fill { height: 100%; border-radius: 2px; background: var(--muted); }
+    .gauge-fill.t-floor { background: var(--bad); }
+    .gauge-fill.t-low { background: var(--warn); }
+    .gauge-fill.t-high { background: var(--ok); }
+    .gauge-tick {
+      position: absolute; top: -3px; width: 1px; height: 10px; background: var(--line-strong);
+    }
+    .gauge-scale {
+      display: flex; justify-content: space-between;
+      margin-top: 5px; color: var(--faint); font: var(--t-label) var(--mono);
+    }
+
+    .pairs { display: flex; flex-wrap: wrap; gap: 14px 24px; margin-top: 16px; }
+    .pair { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .pair-label {
+      color: var(--faint); font: var(--t-label)/1.3 var(--mono);
+      letter-spacing: .11em; text-transform: uppercase;
+    }
+    .pair-value { color: var(--text); font: 500 var(--t-value)/1.2 var(--mono); }
+    .pair-value.is-quiet { color: var(--muted); font: var(--t-meta)/1.35 var(--sans); font-weight: 400; }
+
     .item {
-      display: block; width: 100%; padding: 9px 0; border: 0; border-bottom: 1px solid var(--line);
+      display: block; width: 100%; padding: 9px 0;
+      border: 0; border-bottom: 1px solid var(--line);
       background: none; text-align: left; color: inherit;
     }
     .item:last-child { border-bottom: 0; }
     .item:hover { background: var(--surface-hover); }
-    .item-line { overflow-wrap: anywhere; }
-    .item-why { color: var(--faint); font: var(--t-label) var(--mono); margin-top: 3px; }
+    .item-line { font-size: var(--t-meta); overflow-wrap: anywhere; }
+    .item-why { color: var(--muted); font: var(--t-label) var(--mono); margin-top: 3px; overflow-wrap: anywhere; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
     .tag {
-      padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px;
+      padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-pill);
       color: var(--muted); font: var(--t-label) var(--mono);
     }
-    .nothing { color: var(--faint); padding: 4px 0; }
-    .trust-bar { height: 3px; margin-top: 6px; border-radius: 2px; background: var(--line); }
-    .trust-fill { height: 100%; border-radius: 2px; background: var(--green); }
-    /* Same convention as the router console: a condition worth an operator's
-       attention is a line with a state dot, not a tinted card. The dot is the
-       signal that already means "state" in the masthead, so there is one visual
-       language for it across the panels. */
-    .warn {
-      display: flex; gap: 10px; align-items: baseline;
-      margin: 0 clamp(16px, 2.4vw, 28px); padding: 11px 0;
-      border-bottom: 1px solid var(--line);
-      color: var(--muted); font-size: var(--t-body);
+    .nothing { color: var(--muted); font-size: var(--t-meta); padding: 6px 0; }
+    .more {
+      margin-top: 8px; border: 0; padding: 6px 0; background: none;
+      color: var(--accent-text); font: 600 var(--t-meta) var(--sans);
     }
-    .warn::before { content: ""; flex: 0 0 auto; width: 6px; height: 6px; margin-top: 6px;
-      border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 3px rgba(247, 185, 85, .12); }
-    .warn strong { color: var(--text); }
-    .warn.bad::before { background: var(--red); box-shadow: 0 0 0 3px rgba(255, 107, 125, .12); }
+    .more:hover { text-decoration: underline; }
+
+    /* ONE authored moment: the content settles in once, from an already-visible
+       layout, and never again. */
+    @keyframes enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .enter { animation: enter var(--enter) var(--ease) both; }
+    @media (prefers-reduced-motion: reduce) {
+      .enter { animation: none; }
+      * { animation: none !important; transition: none !important; }
+    }
+
+    /* The host requires 44px under a coarse pointer (its own
+       "@media (hover:none) and (pointer:coarse)" blocks). The zoom buttons were
+       26px squares built for a mouse, sitting over a canvas that also pans by
+       finger — so a missed tap panned the graph instead of zooming it.
+       And the input floor, in the SAME block rather than a second one with the
+       same condition: iOS Safari zooms the page in when a focused input is under
+       16px and does not zoom back out, so tapping search left the operator on a
+       magnified, sideways-scrolling console. The host fixes its own inputs at
+       style.css:6597, but this is a separate document and inherits none of it.
+       max() keeps anything already larger. */
+    @media (hover: none) and (pointer: coarse) {
+      .zoom { gap: 8px; }
+      .zoom button { width: 44px; height: 44px; }
+      .row { min-height: 44px; }
+      .item { min-height: 44px; }
+      .mode { min-height: 44px; }
+      .scope { min-height: 44px; }
+      .btn, .more, .scope-graph { min-height: 44px; }
+      .search { min-height: 44px; }
+      input, textarea, select { font-size: max(16px, 1em); }
+    }
   </style>
 </head>
 <body>
   <div class="shell">
-    <header class="bar">
-      <span class="brand"><span class="brand-name">Memory</span> <span class="brand-host">Hermes One</span></span>
-      <input id="search" class="search" type="search" autocomplete="off"
-             placeholder="Search what the agent knows" aria-label="Search memories">
-      <div class="facts" id="counts"></div>
+    <header class="head">
+      <h1 class="head-title" id="title">Memory</h1>
+      <div class="head-actions">
+        <div class="modes" role="tablist" aria-label="View">
+          <button class="mode" id="modeList" type="button" role="tab" aria-selected="true">List</button>
+          <button class="mode" id="modeGraph" type="button" role="tab" aria-selected="false">Graph</button>
+        </div>
+      </div>
     </header>
-    <div id="warning"></div>
-    <div class="stage">
-      <div class="canvas">
+
+    <div class="bar">
+      <input id="search" class="search" type="search" autocomplete="off"
+             placeholder="Search facts, topics and tags" aria-label="Search what the agent knows">
+      <div class="scopes" id="scopes" role="group" aria-label="Scope"></div>
+      <select id="sort" class="sort" aria-label="Order"></select>
+      <p class="tally num" id="tally" aria-live="polite"></p>
+    </div>
+
+    <div id="notice"></div>
+
+    <div class="stage" id="stage">
+      <div class="pane" id="listPane">
+        <div class="rows" id="rows"></div>
+      </div>
+      <div class="pane canvas" id="graphPane" hidden>
         <svg id="graph" role="img" aria-label="Memory graph"></svg>
-        <p class="hint" id="hint"></p>
-        <div class="zoom">
-          <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
-          <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
-          <button id="zoomFit" type="button" aria-label="Fit graph">⤢</button>
+        <div class="overlay">
+          <div class="legend" id="legend"></div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+            <button class="scope-graph" id="graphScope" type="button"></button>
+            <div class="zoom">
+              <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+              <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+              <button id="zoomFit" type="button" aria-label="Fit graph">⤢</button>
+            </div>
+          </div>
         </div>
       </div>
       <aside class="side" id="side" aria-live="polite"></aside>
@@ -212,10 +555,31 @@
 
       const SIDECAR = '/api/extensions/memory-graph/sidecar';
 
+      // ── the store's own constants ────────────────────────────────────────
+      // Both READ FROM THE RUNNING DEPLOY, not chosen here, because they are the
+      // only things that make a trust decimal mean anything:
+      //   0.50 — plugins/memory/holographic/store.py:23, `trust_score REAL
+      //          DEFAULT 0.5`: what a fact is recorded with when nothing has
+      //          rated it. 37 of the 104 live facts sit exactly here.
+      //   0.30 — ~/.hermes/config.yaml:676, `min_trust_threshold: 0.3`, passed
+      //          as min_trust to HybridRetriever.search: retrieval will not
+      //          serve a fact below it. 6 live facts sit exactly on it.
+      // Feedback moves trust by +0.05 (helpful) and -0.10 (unhelpful), and a
+      // downvote is floored at 0.30 so a demoted fact can still earn its way
+      // back (store.py:80-94, :958).
+      const TRUST_DEFAULT = 0.5;
+      const TRUST_FLOOR = 0.3;
+      // A topic that carries one fact cannot express a relationship: as a node it
+      // is a diamond with exactly one edge. 275 of the live store's 357 topics
+      // are that, which is 59.7% of the nodes the graph used to draw.
+      const LINKING_MIN_FACTS = 2;
+
       const state = {
-        facts: [], entities: [], edges: [], stats: null,
+        facts: [], entities: [], edges: [], stats: null, isolatedIds: [],
         nodes: [], links: [], byId: new Map(),
-        selected: null, query: '', loading: true, error: null,
+        selected: null, query: '', scope: 'all', sort: 'recent',
+        mode: 'list', graphTopics: 'linking', expanded: false,
+        loading: true, error: null, entered: false,
         view: { x: 0, y: 0, k: 1 },
       };
 
@@ -232,6 +596,7 @@
         return n;
       };
       const clear = (n) => { while (n.firstChild) n.removeChild(n.firstChild); };
+      const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
       const csrf = () => {
         try {
@@ -249,17 +614,53 @@
         return { ok: res.ok, status: res.status, data };
       }
 
-      // ── model ────────────────────────────────────────────────────────
-      // A fact's key id space and an entity's overlap (both start at 1), so the
-      // graph namespaces them. Conflating the two would silently wire a fact to
-      // the wrong neighbour.
+      // ── model ────────────────────────────────────────────────────────────
+      // A fact's id space and a topic's overlap (both start at 1), so the graph
+      // namespaces them. Conflating the two would silently wire a fact to the
+      // wrong neighbour.
+      // One clamp for every way the view can be scaled — fit, buttons, wheel and
+      // pinch — so no path can reach a scale another path refuses. Declared up
+      // here because `const` does not hoist: fit() calls clampScale during the
+      // first paint, and a declaration further down would throw ReferenceError.
+      const MIN_SCALE = 0.25, MAX_SCALE = 4;
+      const clampScale = (k) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, k));
+
       const factKey = (id) => `f${id}`;
       const entityKey = (id) => `e${id}`;
+      const near = (a, b) => Math.abs(a - b) < 1e-9;
+      const fmtTrust = (t) => Number(t).toFixed(2);
 
+      // Four bands, each naming a mechanism rather than a third of the range.
+      // The old three bands (<0.45, <0.7, else) put the 37 never-rated facts and
+      // the 6 sitting on the recall floor in the SAME band, and coloured a
+      // default-trust fact amber as though something had doubted it.
       function trustBand(trust) {
-        if (trust < 0.45) return 't-low';
-        if (trust < 0.7) return 't-mid';
+        const t = Number(trust);
+        if (t < TRUST_FLOOR) return 't-floor';
+        if (t < TRUST_DEFAULT) return 't-low';
+        if (near(t, TRUST_DEFAULT)) return 't-default';
         return 't-high';
+      }
+
+      // Why this number is this number, in the store's own terms. Never asserts a
+      // CAUSE: trust can be raised by feedback or recorded above the default at
+      // add time, and /graph cannot tell those apart — measured, 61 facts sit
+      // above 0.50 while only 16 carry any helpful_count at all.
+      function trustWhy(trust) {
+        const t = Number(trust);
+        if (t < TRUST_FLOOR) {
+          return `Below the ${fmtTrust(TRUST_FLOOR)} recall floor, so retrieval will not serve this fact at all.`;
+        }
+        if (near(t, TRUST_FLOOR)) {
+          return `Exactly on the ${fmtTrust(TRUST_FLOOR)} recall floor. One more downvote cannot lower it further, but it is the first thing dropped.`;
+        }
+        if (t < TRUST_DEFAULT) {
+          return `Below the ${fmtTrust(TRUST_DEFAULT)} the store records by default, and above the ${fmtTrust(TRUST_FLOOR)} recall floor.`;
+        }
+        if (near(t, TRUST_DEFAULT)) {
+          return `The ${fmtTrust(TRUST_DEFAULT)} the store records by default. Nothing has rated this fact up or down.`;
+        }
+        return `Above the ${fmtTrust(TRUST_DEFAULT)} the store records by default.`;
       }
 
       function buildModel() {
@@ -279,14 +680,19 @@
           };
           nodes.push(node); byId.set(node.key, node);
         });
+        // Only the topics that can express a relationship, unless the operator
+        // asks for all of them. state.entities keeps every topic either way —
+        // the inspector must still name a fact's single-fact topics, and the
+        // Topics scope must still list all 357. This filter is about the CANVAS.
         state.entities.forEach((e) => {
+          if (state.graphTopics !== 'all' && e.facts < LINKING_MIN_FACTS) return;
           const node = { key: entityKey(e.id), kind: 'entity', id: e.id, label: e.name, entity: e };
           nodes.push(node); byId.set(node.key, node);
         });
 
         const links = [];
         state.edges.forEach((e) => {
-          const a = e.kind === 'shares' ? factKey(e.source) : factKey(e.source);
+          const a = factKey(e.source);
           const b = e.kind === 'shares' ? factKey(e.target) : entityKey(e.target);
           const from = byId.get(a), to = byId.get(b);
           if (from && to) links.push({ kind: e.kind, from, to, weight: e.weight || 1, via: e.via || [] });
@@ -302,10 +708,101 @@
         return s.length > 34 ? `${s.slice(0, 33)}…` : s;
       }
 
-      // ── layout ───────────────────────────────────────────────────────
+      const topicsOf = (fact) => state.entities.filter((e) => (fact.entities || []).includes(e.id));
+      const degreeOf = (id) => {
+        const node = state.byId.get(factKey(id));
+        return node ? node.degree : 0;
+      };
+
+      // ── scopes ───────────────────────────────────────────────────────────
+      // Every scope is a counted subset of the live response, never a guess, and
+      // each exists because it answers a question the flat graph could not.
+      const SCOPES = [
+        {
+          id: 'all', label: 'All facts',
+          count: () => state.facts.length,
+          pick: () => state.facts.slice(),
+        },
+        {
+          id: 'notopic', label: 'No topic',
+          // /graph.stats.isolated and /graph.isolated_facts: facts nothing was
+          // extracted from. Topic-based recall cannot reach them. The old console
+          // named the count in a notice and gave no way to open them.
+          count: () => state.isolatedIds.length,
+          pick: () => state.facts.filter((f) => state.isolatedIds.includes(f.id)),
+        },
+        {
+          id: 'unlinked', label: 'No shared topic',
+          // A fact WITH topics that still shares none with any other fact: the
+          // graph draws it as a lone disc and the old inspector was the only
+          // place that said why. Live: 9 facts, of which 5 have no topic at all.
+          count: () => state.facts.filter((f) => degreeOf(f.id) === 0).length,
+          pick: () => state.facts.filter((f) => degreeOf(f.id) === 0),
+        },
+        {
+          id: 'lowtrust', label: 'Under default trust',
+          count: () => state.facts.filter((f) => Number(f.trust) < TRUST_DEFAULT).length,
+          pick: () => state.facts.filter((f) => Number(f.trust) < TRUST_DEFAULT),
+        },
+        {
+          id: 'unserved', label: 'Never served',
+          count: () => state.facts.filter((f) => !f.retrievals).length,
+          pick: () => state.facts.filter((f) => !f.retrievals),
+        },
+        {
+          id: 'topics', label: 'Topics',
+          count: () => state.entities.length,
+          pick: () => [],
+        },
+      ];
+      const scopeById = (id) => SCOPES.find((s) => s.id === id) || SCOPES[0];
+
+      const SORTS = [
+        { id: 'recent', label: 'Newest first', cmp: (a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')) },
+        { id: 'served', label: 'Most served', cmp: (a, b) => (b.retrievals || 0) - (a.retrievals || 0) },
+        { id: 'trust', label: 'Lowest trust', cmp: (a, b) => Number(a.trust) - Number(b.trust) },
+        { id: 'linked', label: 'Most shared topics', cmp: (a, b) => degreeOf(b.id) - degreeOf(a.id) },
+      ];
+      const sortById = (id) => SORTS.find((s) => s.id === id) || SORTS[0];
+
+      function matchesFact(f, q) {
+        if (!q) return true;
+        const topics = topicsOf(f).map((e) => `${e.name} ${(e.aliases || []).join(' ')}`);
+        return [f.content, f.category, ...(f.tags || []), ...topics]
+          .some((v) => String(v || '').toLowerCase().includes(q));
+      }
+
+      function matchesEntity(e, q) {
+        if (!q) return true;
+        return String(e.name).toLowerCase().includes(q)
+          || (e.aliases || []).some((a) => String(a).toLowerCase().includes(q));
+      }
+
+      // The node-level predicate the canvas dims by. Kept as one exported
+      // function so the graph and the list can never disagree about what a query
+      // matched.
+      function matches(node, q) {
+        if (!q) return true;
+        return node.kind === 'entity' ? matchesEntity(node.entity, q) : matchesFact(node.fact, q);
+      }
+
+      // The list's subject set: scope, then query, then order. Returns facts, or
+      // topics when the Topics scope is active.
+      function visible() {
+        const q = state.query.trim().toLowerCase();
+        if (state.scope === 'topics') {
+          const rows = state.entities.filter((e) => matchesEntity(e, q));
+          rows.sort((a, b) => (b.facts - a.facts) || String(a.name).localeCompare(String(b.name)));
+          return { kind: 'topics', rows };
+        }
+        const rows = scopeById(state.scope).pick().filter((f) => matchesFact(f, q));
+        rows.sort(sortById(state.sort).cmp);
+        return { kind: 'facts', rows };
+      }
+
+      // ── layout ───────────────────────────────────────────────────────────
       // A small force simulation, run to completion before the first paint so the
-      // operator never watches nodes fly around. 104 nodes converge in well under
-      // a frame budget; nothing here needs to be incremental.
+      // operator never watches nodes fly around.
       function layout(width, height) {
         const nodes = state.nodes;
         if (!nodes.length) return;
@@ -320,13 +817,13 @@
           node.vx = 0; node.vy = 0;
         });
 
-        // Spacing is driven by node count, not by the viewport: packing 213
-        // nodes into 900x560 guarantees overlap. Lay out roomy, then fit().
+        // Spacing is driven by node count, not by the viewport: packing hundreds
+        // of nodes into 900x560 guarantees overlap. Lay out roomy, then fit().
         const ideal = Math.max(46, 1400 / Math.sqrt(n) * 2.2);
         for (let step = 0; step < 420; step++) {
           const cool = 1 - step / 420;
-          // Repulsion, O(n²) — at 104 nodes that is ~11k pairs per step, which is
-          // cheap and exact; a quadtree would add code for no gain at this size.
+          // Repulsion, O(n²) — cheap and exact at this size; a quadtree would add
+          // code for no gain.
           for (let i = 0; i < n; i++) {
             const a = nodes[i];
             for (let j = i + 1; j < n; j++) {
@@ -341,7 +838,7 @@
             }
           }
           // Attraction along edges; a heavier edge pulls harder, so facts that
-          // share more entities end up visibly closer.
+          // share more topics end up visibly closer.
           state.links.forEach((link) => {
             const a = link.from, b = link.to;
             let dx = b.x - a.x, dy = b.y - a.y;
@@ -374,12 +871,21 @@
         const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
-        const pad = 54;
-        const k = Math.min(
+        // Padding shrinks with the canvas: 54px of margin on each side of a 390px
+        // phone spends 28% of the width on nothing.
+        const pad = width < 480 ? 16 : 54;
+        // A FLOOR as well as a ceiling. This was Math.min(fitX, fitY, 1.7) with no
+        // lower bound, so on a 390px canvas hundreds of nodes fitted at k≈0.21 —
+        // every node a 2-6px speck, every label unreadable, and below the 0.25 the
+        // zoom buttons themselves enforce. "Everything is on screen" is not the
+        // goal; "you can see what is on screen" is. Below the floor the graph
+        // overflows and is panned, which the operator can do — unlike reading 2px
+        // discs.
+        const k = clampScale(Math.min(
           (width - pad * 2) / Math.max(1, maxX - minX),
           (height - pad * 2) / Math.max(1, maxY - minY),
           1.7,
-        );
+        ));
         state.view = {
           k,
           x: (width - (maxX + minX) * k) / 2,
@@ -387,28 +893,17 @@
         };
       }
 
-      // ── focus ────────────────────────────────────────────────────────
+      // ── focus ────────────────────────────────────────────────────────────
       function neighbours(key) {
-        const near = new Set();
+        const found = new Set();
         state.links.forEach((link) => {
-          if (link.from.key === key) near.add(link.to.key);
-          if (link.to.key === key) near.add(link.from.key);
+          if (link.from.key === key) found.add(link.to.key);
+          if (link.to.key === key) found.add(link.from.key);
         });
-        return near;
+        return found;
       }
 
-      function matches(node, q) {
-        if (!q) return true;
-        if (node.kind === 'entity') {
-          return node.entity.name.toLowerCase().includes(q)
-            || node.entity.aliases.some((a) => a.toLowerCase().includes(q));
-        }
-        const f = node.fact;
-        return [f.content, f.category, ...(f.tags || [])]
-          .some((v) => String(v || '').toLowerCase().includes(q));
-      }
-
-      // ── render ───────────────────────────────────────────────────────
+      // ── the canvas ───────────────────────────────────────────────────────
       function draw() {
         const svg = $('graph');
         const box = svg.getBoundingClientRect();
@@ -419,7 +914,7 @@
 
         const q = state.query.trim().toLowerCase();
         const hits = q ? new Set(state.nodes.filter((n) => matches(n, q)).map((n) => n.key)) : null;
-        const near = state.selected ? neighbours(state.selected) : null;
+        const focusNear = state.selected ? neighbours(state.selected) : null;
 
         const root = svgEl('g', {
           transform: `translate(${state.view.x} ${state.view.y}) scale(${state.view.k})`,
@@ -433,12 +928,11 @@
             && (link.from.key === state.selected || link.to.key === state.selected);
           const faded = (state.selected && !on)
             || (hits && !(hits.has(link.from.key) && hits.has(link.to.key)));
-          const line = svgEl('line', {
+          edgeLayer.appendChild(svgEl('line', {
             class: `edge ${link.kind}${on ? ' on' : ''}${faded ? ' dim' : ''}`,
             x1: link.from.x, y1: link.from.y, x2: link.to.x, y2: link.to.y,
             'stroke-width': link.kind === 'shares' ? Math.min(1 + link.weight * 0.5, 3) : 1,
-          });
-          edgeLayer.appendChild(line);
+          }));
         });
 
         // Claimed label boxes, in screen space, so a label is only drawn where it
@@ -448,11 +942,11 @@
           const w = chars * 5.6 + 12, h = 12;
           const x = node.x * state.view.k + state.view.x + 11;
           const y = node.y * state.view.k + state.view.y - 6;
-          const box = { x, y, w, h };
-          const hit = claimed.some((c) => x < c.x + c.w && c.x < x + box.w
-            && y < c.y + c.h && c.y < y + box.h);
+          const box2 = { x, y, w, h };
+          const hit = claimed.some((c) => x < c.x + c.w && c.x < x + box2.w
+            && y < c.y + c.h && c.y < y + box2.h);
           if (hit) return false;
-          claimed.push(box);
+          claimed.push(box2);
           return true;
         };
 
@@ -465,7 +959,7 @@
 
         order.forEach((node) => {
           const isSelected = node.key === state.selected;
-          const isNear = !!(near && near.has(node.key));
+          const isNear = !!(focusNear && focusNear.has(node.key));
           const faded = (hits && !hits.has(node.key)) || (state.selected && !isSelected && !isNear);
           const classes = ['node'];
           if (isSelected) classes.push('on');
@@ -476,8 +970,9 @@
           const g = svgEl('g', { class: classes.join(' '), transform: `translate(${node.x} ${node.y})` });
           g.dataset.key = node.key;
           if (node.kind === 'fact') {
-            // Radius grows with connections: the load-bearing knowledge should
-            // read as bigger without needing a legend.
+            // Radius grows with shared-topic count. Labelled honestly in the
+            // legend: at this store 41% of those links rest on the single token
+            // "Hermes", so size is exposure, not importance.
             const r = 4.5 + Math.min(node.degree, 12) * 0.7;
             g.appendChild(svgEl('circle', { class: 'n-fact', r }));
           } else {
@@ -487,21 +982,18 @@
               transform: 'rotate(45)', rx: 1.5,
             }));
           }
-          // Labels only where they can be read: everything at once is noise.
-          // At rest only the landmarks are named: 213 labels at once is an
-          // unreadable mat of overlapping text, which is worse than none. Focus,
-          // search and hover are what reveal the others.
+          // At rest only the landmarks are named: hundreds of labels at once is an
+          // unreadable mat of overlapping text, which is worse than none. Focus
+          // and search reveal the others.
           const isLandmark = node.kind === 'entity'
             ? node.entity.facts >= 4
             : node.degree >= 10;
-          // With a big focus group, labelling every neighbour is noise. Keep the
-          // selection and the landmarks; the rest are identified by clicking.
-          const crowded = near && near.size > 12;
+          // With a big focus group, labelling every neighbour is noise.
+          const crowded = focusNear && focusNear.size > 12;
           const wants = isSelected || isLandmark
             || (isNear && !crowded)
             || (hits && hits.has(node.key) && hits.size <= 30);
-          const labelled = wants && fits(node, node.label.length);
-          if (labelled) {
+          if (wants && fits(node, node.label.length)) {
             const text = svgEl('text', { class: 'n-label', x: 11, y: 3.5 });
             text.textContent = node.label;
             g.appendChild(text);
@@ -510,188 +1002,503 @@
           root.appendChild(g);
         });
 
-        $('hint').textContent = state.nodes.length
-          ? 'drag to pan · scroll to zoom · click a node'
-          : '';
+        renderLegend();
       }
 
-      function renderCounts() {
-        const box = $('counts');
+      // The graph says what it is showing and what it is hiding. Both numbers are
+      // counted from the live response; neither is an estimate.
+      function renderLegend() {
+        const box = $('legend');
         clear(box);
-        const s = state.stats;
-        if (!s) return;
-        const add = (label, value) => {
-          const f = el('div', 'fact');
-          f.append(el('span', 'fact-label', label), el('span', 'fact-value', value));
-          box.append(f);
-        };
-        add('facts', s.facts);
-        add('topics', s.entities);
-        add('links', s.shares);
-        // Facts nothing was extracted from cannot be reached by topic — a real
-        // finding, so it is stated rather than left to be noticed.
-        if (s.isolated) add('unlinked', s.isolated);
+        if (!state.nodes.length) return;
+        const facts = state.nodes.filter((n) => n.kind === 'fact').length;
+        const topics = state.nodes.filter((n) => n.kind === 'entity').length;
+        box.append(el('p', '', `${plural(facts, 'fact', 'facts')} as discs, sized by shared topics · ${plural(topics, 'topic', 'topics')} as diamonds`));
+        const hidden = state.entities.length - topics;
+        if (hidden > 0) {
+          // The COUNT is never hidden — only the sentence explaining it is, and
+          // only on a phone, where the canvas is 364px tall. See the 640px block.
+          const line = el('p', '');
+          line.append(el('span', '', `${plural(hidden, 'topic', 'topics')} carrying a single fact hidden`));
+          line.append(el('span', 'why', ' — a lone diamond states no relationship.'));
+          box.append(line);
+        }
+        // The instruction has to match the hand. "scroll to zoom" is wrong advice
+        // on a phone — there is no wheel and the gesture is a pinch — and an
+        // interface that tells you to do something impossible reads as broken.
+        box.append(el('p', 'hint', isTouch()
+          ? 'drag to pan · pinch to zoom · tap a node'
+          : 'drag to pan · scroll to zoom · click a node'));
+
+        const scopeBtn = $('graphScope');
+        scopeBtn.textContent = state.graphTopics === 'linking'
+          ? `Show all ${state.entities.length} topics`
+          : `Show only linking topics (${state.entities.filter((e) => e.facts >= LINKING_MIN_FACTS).length})`;
       }
 
-      function renderWarning() {
-        const box = $('warning');
+      // ── chrome ───────────────────────────────────────────────────────────
+      function renderScopes() {
+        const box = $('scopes');
+        clear(box);
+        if (state.loading || state.error) return;
+        SCOPES.forEach((scope) => {
+          const count = scope.count();
+          // A scope with nothing in it is not offered: an operator should never
+          // click a filter that can only ever be empty.
+          if (!count && scope.id !== 'all') return;
+          const b = el('button', 'scope');
+          b.type = 'button';
+          b.setAttribute('aria-pressed', String(state.scope === scope.id));
+          b.append(el('span', '', scope.label), el('span', 'num', count));
+          b.addEventListener('click', () => {
+            state.scope = state.scope === scope.id && scope.id !== 'all' ? 'all' : scope.id;
+            renderList(); renderScopes(); renderTally();
+          });
+          box.append(b);
+        });
+      }
+
+      // Built once, then only re-pointed. The guard is a flag rather than a read
+      // of sel.options: `options` is an HTMLSelectElement-only collection, so
+      // reading it to decide whether to populate ties this function to one
+      // element type and threw on the first call in a harness whose select is a
+      // plain node. What is being asked is "have I already filled this in",
+      // which is our state, not the DOM's.
+      let sortFilled = false;
+      function renderSort() {
+        const sel = $('sort');
+        sel.hidden = state.scope === 'topics' || state.loading || !!state.error;
+        if (!sortFilled) {
+          sortFilled = true;
+          SORTS.forEach((s) => {
+            const o = document.createElement('option');
+            o.value = s.id; o.textContent = s.label;
+            sel.append(o);
+          });
+        }
+        sel.value = state.sort;
+      }
+
+      // The count the old search never reported. Without it "no results" and
+      // "the filter did not run" look identical.
+      function renderTally() {
+        const box = $('tally');
+        clear(box);
+        if (state.loading || state.error) return;
+        const { kind, rows } = visible();
+        const total = kind === 'topics' ? state.entities.length : scopeById(state.scope).count();
+        const noun = kind === 'topics' ? 'topics' : 'facts';
+        const text = rows.length === total
+          ? `${plural(total, noun.slice(0, -1), noun)}`
+          : `${rows.length} of ${total} ${noun}`;
+        box.textContent = text;
+      }
+
+      function renderNotice() {
+        const box = $('notice');
         clear(box);
         if (state.error) {
-          const line = el('div', 'warn bad');
-          line.append(el('strong', '', 'Memory unavailable. '), el('span', '', state.error));
+          const line = el('div', 'note is-bad');
+          line.append(
+            el('strong', '', 'Memory unavailable. '),
+            el('span', '', `${state.error} The graph sidecar answers GET only; nothing here writes.`),
+          );
           box.append(line);
           return;
         }
-        if (!state.loading && state.stats && state.stats.isolated) {
-          const line = el('div', 'warn');
-          line.append(
-            el('strong', '', `${state.stats.isolated} facts have no topic. `),
-            el('span', '', 'Topic-based recall cannot reach them, so they are effectively write-only.'),
+        if (state.loading || !state.stats) return;
+        // Counted from isolated_facts, the same array the "No topic" scope opens —
+        // NOT from stats.isolated. graph.py builds the two together so they agree,
+        // but reading the count from one field and the destination from another
+        // makes it possible for this notice to promise facts the scope cannot
+        // show. One source, so the promise is always keepable.
+        const isolated = state.isolatedIds.length;
+        if (isolated) {
+          // A finding with a destination. The old notice named these 5 facts and
+          // then left them unreachable: nothing on screen could filter to them.
+          const line = el('button', 'note');
+          line.type = 'button';
+          const body = el('span', '');
+          body.append(
+            el('strong', '', `${plural(isolated, 'fact has', 'facts have')} no topic. `),
+            el('span', '', 'Nothing was extracted from them, so topic-based recall cannot reach them. '),
           );
+          line.append(body, el('span', 'note-go', 'Open them'));
+          line.addEventListener('click', () => {
+            state.scope = 'notopic';
+            state.mode = 'list';
+            applyMode();
+            renderList(); renderScopes(); renderTally();
+          });
           box.append(line);
         }
       }
 
+      function renderList() {
+        const box = $('rows');
+        clear(box);
+        if (state.loading) { box.append(el('p', 'nothing', 'Reading the store…')); return; }
+        if (state.error) return;
+        const { kind, rows } = visible();
+
+        if (!rows.length) {
+          box.append(emptyState(kind));
+          return;
+        }
+        if (kind === 'topics') {
+          rows.forEach((e) => box.append(topicRow(e)));
+          return;
+        }
+        rows.forEach((f) => box.append(factRow(f)));
+      }
+
+      // Errors and absences name the problem AND the way out.
+      function emptyState(kind) {
+        const wrap = el('div', 'empty');
+        const q = state.query.trim();
+        const scope = scopeById(state.scope);
+        const noun = kind === 'topics' ? 'topic' : 'fact';
+        if (q) {
+          wrap.append(el('p', 'empty-title', `No ${noun} matches “${q}”.`));
+          wrap.append(el('p', 'empty-sub', state.scope === 'all'
+            ? `Search reads fact content, category, tags and topic names across all ${state.facts.length} facts.`
+            : `Searched inside “${scope.label}” only — ${plural(scope.count(), noun, `${noun}s`)}.`));
+          const act = el('div', 'empty-act');
+          const clearBtn = el('button', 'btn', 'Clear search');
+          clearBtn.type = 'button';
+          clearBtn.addEventListener('click', () => {
+            state.query = '';
+            $('search').value = '';
+            renderList(); renderTally(); if (state.mode === 'graph') draw();
+          });
+          act.append(clearBtn);
+          if (state.scope !== 'all') {
+            const allBtn = el('button', 'btn', `Search all ${state.facts.length} facts`);
+            allBtn.type = 'button';
+            allBtn.style.marginLeft = '8px';
+            allBtn.addEventListener('click', () => {
+              state.scope = 'all';
+              renderList(); renderScopes(); renderTally();
+            });
+            act.append(allBtn);
+          }
+          wrap.append(act);
+          return wrap;
+        }
+        wrap.append(el('p', 'empty-title', state.facts.length
+          ? `Nothing in “${scope.label}”.`
+          : 'The agent has recorded nothing yet.'));
+        wrap.append(el('p', 'empty-sub', state.facts.length
+          ? 'That is a result, not a failure: no fact currently meets this condition.'
+          : 'Facts appear here as the agent records them; this console never writes.'));
+        return wrap;
+      }
+
+      function factRow(f) {
+        const row = el('button', `row ${trustBand(f.trust)}`);
+        row.type = 'button';
+        row.setAttribute('aria-current', String(state.selected === factKey(f.id)));
+        row.append(el('span', 'row-line', f.content));
+        const meta = el('div', 'row-meta');
+        const trust = el('span', '');
+        trust.append(el('span', 'dot'), el('span', 'num', `${fmtTrust(f.trust)} trust`));
+        meta.append(trust);
+        meta.append(el('span', '', f.category));
+        const d = degreeOf(f.id);
+        const t = (f.entities || []).length;
+        meta.append(el('span', 'num', t ? `${t} topics · ${d} shared` : 'no topic'));
+        meta.append(el('span', 'num', f.retrievals ? `served ${f.retrievals}×` : 'never served'));
+        meta.append(el('span', 'num', f.created_at || '—'));
+        row.append(meta);
+        row.addEventListener('click', () => select(factKey(f.id)));
+        return row;
+      }
+
+      function topicRow(e) {
+        const row = el('button', 'row');
+        row.type = 'button';
+        row.setAttribute('aria-current', String(state.selected === entityKey(e.id)));
+        row.append(el('span', 'row-line', e.name));
+        const meta = el('div', 'row-meta');
+        meta.append(el('span', 'num', plural(e.facts, 'fact', 'facts')));
+        if (e.facts < LINKING_MIN_FACTS) {
+          meta.append(el('span', 'sans', 'links nothing to anything'));
+        }
+        if ((e.aliases || []).length) meta.append(el('span', '', `also ${e.aliases.join(', ')}`));
+        row.append(meta);
+        row.addEventListener('click', () => select(entityKey(e.id)));
+        return row;
+      }
+
+      // ── inspector ────────────────────────────────────────────────────────
       function renderSide() {
         const box = $('side');
         clear(box);
-        if (state.loading) { box.append(el('p', 'nothing', 'Loading…')); return; }
-        if (!state.selected) {
-          box.append(el('span', 'kicker', 'The constellation'));
-          const s = state.stats || {};
-          const p = el('p', 'subject', s.facts
-            ? `${s.facts} things the agent knows, about ${s.entities} topics.`
-            : 'Nothing recorded yet.');
-          box.append(p);
-          if (s.facts) {
-            box.append(el('p', 'item-why',
-              'Discs are facts, sized by how connected they are; diamonds are topics. '
-              + 'A solid line means two facts share a topic — click one to see which.'));
-          }
-          const strong = [...state.nodes]
-            .filter((n) => n.kind === 'fact')
-            .sort((a, b) => b.degree - a.degree)
-            .slice(0, 5);
-          if (strong.length) {
-            const group = el('div', 'group');
-            group.append(el('span', 'kicker', 'Most connected'));
-            strong.forEach((node) => {
-              const item = el('button', 'item');
-              item.type = 'button';
-              item.append(el('div', 'item-line', shortLabel(node.fact.content)));
-              item.append(el('div', 'item-why', `${node.degree} links · ${node.fact.category}`));
-              item.addEventListener('click', () => select(node.key));
-              group.append(item);
-            });
-            box.append(group);
-          }
+        if (state.loading) { box.append(el('p', 'nothing', 'Reading the store…')); return; }
+        if (state.error) {
+          box.append(el('span', 'kicker', 'No store'));
+          box.append(el('p', 'subject', 'The console could not read the memory store.'));
+          box.append(el('p', 'prose', state.error));
           return;
         }
+        if (!state.selected) { box.append(summary()); return; }
 
         const node = state.byId.get(state.selected);
-        if (!node) return;
-
-        if (node.kind === 'entity') {
-          box.append(el('span', 'kicker', 'Topic'));
-          box.append(el('p', 'subject', node.entity.name));
-          if (node.entity.aliases.length) {
-            const tags = el('div', 'tags');
-            node.entity.aliases.forEach((a) => tags.append(el('span', 'tag', a)));
-            box.append(tags);
-          }
-          const group = el('div', 'group');
-          group.append(el('span', 'kicker', `${node.entity.facts} facts`));
-          state.facts
-            .filter((f) => (f.entities || []).includes(node.id))
-            .forEach((f) => {
-              const item = el('button', 'item');
-              item.type = 'button';
-              item.append(el('div', 'item-line', f.content));
-              item.append(el('div', 'item-why', `${f.category} · trust ${f.trust}`));
-              item.addEventListener('click', () => select(factKey(f.id)));
-              group.append(item);
-            });
-          box.append(group);
+        if (node) {
+          box.append(node.kind === 'entity' ? topicPanel(node.entity) : factPanel(node.fact));
           return;
         }
-
-        const f = node.fact;
-        box.append(el('span', 'kicker', f.category));
-        box.append(el('p', 'subject', f.content));
-
-        const bar = el('div', 'trust-bar');
-        const fill = el('div', 'trust-fill');
-        fill.style.width = `${Math.round(f.trust * 100)}%`;
-        if (f.trust < 0.45) fill.style.background = 'var(--red)';
-        else if (f.trust < 0.7) fill.style.background = 'var(--amber)';
-        bar.append(fill);
-        box.append(bar);
-
-        const meta = el('div', 'meta');
-        const add = (label, value) => {
-          const f2 = el('div', 'fact');
-          f2.append(el('span', 'fact-label', label), el('span', 'fact-value', value));
-          meta.append(f2);
-        };
-        add('trust', f.trust);
-        add('helpful', f.helpful);
-        // retrieval_count is not incremented by the live retrieval path in this
-        // deploy, so it is labelled for what it is rather than presented as usage.
-        add('recorded uses', f.retrievals);
-        box.append(meta);
-        box.append(el('p', 'item-why', `learned ${f.created_at || '—'}`));
-
-        if (f.tags.length) {
-          const tags = el('div', 'tags');
-          f.tags.forEach((t) => tags.append(el('span', 'tag', t)));
-          box.append(tags);
-        }
-
-        const topics = state.entities.filter((e) => (f.entities || []).includes(e.id));
-        if (topics.length) {
-          const group = el('div', 'group');
-          group.append(el('span', 'kicker', 'About'));
-          topics.forEach((e) => {
-            const item = el('button', 'item');
-            item.type = 'button';
-            item.append(el('div', 'item-line', e.name));
-            item.append(el('div', 'item-why', `${e.facts} facts`));
-            item.addEventListener('click', () => select(entityKey(e.id)));
-            group.append(item);
-          });
-          box.append(group);
-        }
-
-        const related = state.links
-          .filter((l) => l.kind === 'shares' && (l.from.key === node.key || l.to.key === node.key))
-          .map((l) => ({ other: l.from.key === node.key ? l.to : l.from, via: l.via, weight: l.weight }))
-          .sort((a, b) => b.weight - a.weight);
-        const group = el('div', 'group');
-        group.append(el('span', 'kicker', related.length ? `Related · ${related.length}` : 'Related'));
-        if (!related.length) {
-          group.append(el('p', 'nothing', topics.length
-            ? 'No other fact shares a topic with this one.'
-            : 'No topic was extracted from this fact, so nothing can relate to it.'));
-        }
-        related.forEach((rel) => {
-          const item = el('button', 'item');
-          item.type = 'button';
-          item.append(el('div', 'item-line', rel.other.fact ? rel.other.fact.content : rel.other.label));
-          // Every relationship states its evidence: the operator never has to
-          // trust the layout.
-          item.append(el('div', 'item-why', `shares ${rel.via.join(', ')}`));
-          item.addEventListener('click', () => select(rel.other.key));
-          group.append(item);
-        });
-        box.append(group);
+        // A subject can be selected from the list while the canvas is not drawing
+        // it (a single-fact topic with the linking filter on). The data is whole
+        // even when the graph is filtered, so look it up there.
+        const raw = state.selected.slice(1);
+        const asFact = state.facts.find((f) => String(f.id) === raw && state.selected[0] === 'f');
+        if (asFact) { box.append(factPanel(asFact)); return; }
+        const asTopic = state.entities.find((e) => String(e.id) === raw && state.selected[0] === 'e');
+        if (asTopic) { box.append(topicPanel(asTopic)); return; }
+        box.append(summary());
       }
 
+      // No selection: what the store IS, in counted terms, and the honest caveat
+      // about the one ranking this console used to offer.
+      function summary() {
+        const wrap = el('div', '');
+        const s = state.stats || {};
+        wrap.append(el('span', 'kicker', 'The store'));
+        wrap.append(el('p', 'subject', s.facts
+          ? `${plural(s.facts, 'fact', 'facts')}, drawn from ${plural(s.entities, 'topic', 'topics')}.`
+          : 'Nothing recorded yet.'));
+        if (!s.facts) return wrap;
+
+        const pairs = el('div', 'pairs');
+        const pair = (label, value, quiet) => {
+          const p = el('div', 'pair');
+          p.append(el('span', 'pair-label', label));
+          p.append(el('span', `pair-value${quiet ? ' is-quiet' : ''}`, value));
+          pairs.append(p);
+        };
+        pair('facts', s.facts);
+        pair('topics', s.entities);
+        pair('shared-topic links', s.shares);
+        pair('no topic', s.isolated);
+        wrap.append(pairs);
+
+        // The honest replacement for "Most connected". That list ranked facts by
+        // edge count, and 350 of the live store's 857 edges (41%) rest on the
+        // single token "Hermes" — so it ranked facts by how often one word
+        // appears. Retrieval count is what the agent actually did.
+        const served = state.facts.filter((f) => f.retrievals > 0)
+          .sort((a, b) => b.retrievals - a.retrievals)
+          .slice(0, 5);
+        if (served.length) {
+          const group = el('div', 'group');
+          group.append(el('span', 'kicker', 'Most served to the model'));
+          served.forEach((f) => group.append(miniItem(f.content, `served ${f.retrievals}× · ${fmtTrust(f.trust)} trust · ${f.category}`, () => select(factKey(f.id)))));
+          wrap.append(group);
+        }
+        const unserved = state.facts.filter((f) => !f.retrievals).length;
+        if (unserved) {
+          wrap.append(el('p', 'prose', `${plural(unserved, 'fact has', 'facts have')} never been served since the store began counting retrievals.`));
+        }
+        return wrap;
+      }
+
+      function miniItem(line, why, onClick) {
+        const item = el('button', 'item');
+        item.type = 'button';
+        item.append(el('div', 'item-line', shortLabel(line)));
+        item.append(el('div', 'item-why', why));
+        item.addEventListener('click', onClick);
+        return item;
+      }
+
+      function factPanel(f) {
+        const wrap = el('div', '');
+        wrap.append(el('span', 'kicker', f.category));
+        wrap.append(el('p', 'subject', f.content));
+
+        // ── why it is trusted ──
+        const band = trustBand(f.trust);
+        const trust = el('div', 'group');
+        trust.append(el('span', 'kicker', 'Why it is trusted'));
+        const gauge = el('div', 'gauge');
+        const top = el('div', 'gauge-top');
+        const value = el('span', 'gauge-value num', fmtTrust(f.trust));
+        top.append(value, el('span', 'gauge-of num', 'of 1.00'));
+        gauge.append(top);
+        const track = el('div', 'gauge-track');
+        const fill = el('div', `gauge-fill ${band}`);
+        fill.style.width = `${Math.max(0, Math.min(100, Number(f.trust) * 100))}%`;
+        track.append(fill);
+        // The two ticks are what make the number readable: the floor retrieval
+        // enforces and the value the store records by default.
+        const floorTick = el('div', 'gauge-tick');
+        floorTick.style.left = `${TRUST_FLOOR * 100}%`;
+        const defTick = el('div', 'gauge-tick');
+        defTick.style.left = `${TRUST_DEFAULT * 100}%`;
+        track.append(floorTick, defTick);
+        gauge.append(track);
+        const scale = el('div', 'gauge-scale');
+        scale.append(
+          el('span', '', `${fmtTrust(TRUST_FLOOR)} recall floor`),
+          el('span', '', `${fmtTrust(TRUST_DEFAULT)} default`),
+        );
+        gauge.append(scale);
+        trust.append(gauge);
+        trust.append(el('p', 'prose', trustWhy(f.trust)));
+        // helpful_count is upvotes only: store.py increments it on helpful=True
+        // and leaves it alone on a downvote, so 0 means "no upvote", never
+        // "rated unhelpful".
+        trust.append(el('p', 'prose', f.helpful
+          ? `${plural(f.helpful, 'upvote', 'upvotes')} recorded. A downvote lowers trust without counting here, so this is upvotes only.`
+          : 'No upvote recorded. The store counts upvotes only, so this does not mean it was rated unhelpful.'));
+        wrap.append(trust);
+
+        // ── use ──
+        const use = el('div', 'group');
+        use.append(el('span', 'kicker', 'Use'));
+        const pairs = el('div', 'pairs');
+        const addPair = (label, value, quiet) => {
+          const p = el('div', 'pair');
+          p.append(el('span', 'pair-label', label));
+          p.append(el('span', `pair-value${quiet ? ' is-quiet' : ''}`, value));
+          pairs.append(p);
+        };
+        addPair('served', f.retrievals ? `${f.retrievals}×` : 'never');
+        addPair('learned', f.created_at || 'unknown', true);
+        if (f.updated_at && f.updated_at !== f.created_at) addPair('changed', f.updated_at, true);
+        use.append(pairs);
+        // Named for what the counter counts. Verified in the running deploy:
+        // HybridRetriever.search is the only live retrieval path and it calls
+        // store.record_retrievals on every result set
+        // (plugins/memory/holographic/retrieval.py:165).
+        use.append(el('p', 'prose', f.retrievals
+          ? 'Counted each time retrieval served this fact to the model.'
+          : 'Retrieval has never served this fact. It is stored and searchable, but it has not reached the model.'));
+        wrap.append(use);
+
+        if ((f.tags || []).length) {
+          const tagGroup = el('div', 'group');
+          tagGroup.append(el('span', 'kicker', 'Tags'));
+          const tags = el('div', 'tags');
+          f.tags.forEach((t) => tags.append(el('span', 'tag', t)));
+          tagGroup.append(tags);
+          wrap.append(tagGroup);
+        }
+
+        // ── topics ──
+        const topics = topicsOf(f);
+        const topicGroup = el('div', 'group');
+        topicGroup.append(el('span', 'kicker', topics.length ? `About · ${topics.length}` : 'About'));
+        if (!topics.length) {
+          topicGroup.append(el('p', 'nothing', 'No topic was extracted from this fact, so topic-based recall cannot reach it. Search still finds it.'));
+        }
+        topics.forEach((e) => topicGroup.append(miniItem(
+          e.name,
+          e.facts >= LINKING_MIN_FACTS
+            ? `${plural(e.facts, 'fact', 'facts')}`
+            : `only this fact — links nothing`,
+          () => select(entityKey(e.id)),
+        )));
+        wrap.append(topicGroup);
+
+        // ── related ──
+        const related = state.edges
+          .filter((e) => e.kind === 'shares' && (e.source === f.id || e.target === f.id))
+          .map((e) => ({
+            other: state.facts.find((x) => x.id === (e.source === f.id ? e.target : e.source)),
+            via: e.via || [], weight: e.weight || 1,
+          }))
+          .filter((r) => r.other)
+          .sort((a, b) => b.weight - a.weight);
+        const relGroup = el('div', 'group');
+        relGroup.append(el('span', 'kicker', related.length ? `Shares a topic with · ${related.length}` : 'Shares a topic with'));
+        if (!related.length) {
+          relGroup.append(el('p', 'nothing', topics.length
+            ? 'No other fact shares a topic with this one.'
+            : 'Nothing can share a topic with it, because it has none.'));
+        }
+        // Long lists are collapsed: the live store's busiest fact shares a topic
+        // with 43 others, and 43 rows below the reason you opened the fact is not
+        // disclosure, it is burial.
+        const CAP = 8;
+        const shown = state.expanded ? related : related.slice(0, CAP);
+        shown.forEach((rel) => relGroup.append(miniItem(
+          rel.other.content,
+          // Every relationship states its evidence, so the operator never has to
+          // trust the layout.
+          `via ${rel.via.join(', ') || 'an unnamed topic'}`,
+          () => select(factKey(rel.other.id)),
+        )));
+        if (related.length > CAP) {
+          const more = el('button', 'more', state.expanded
+            ? 'Show fewer'
+            : `Show all ${related.length}`);
+          more.type = 'button';
+          more.addEventListener('click', () => { state.expanded = !state.expanded; renderSide(); });
+          relGroup.append(more);
+        }
+        wrap.append(relGroup);
+        return wrap;
+      }
+
+      function topicPanel(e) {
+        const wrap = el('div', '');
+        wrap.append(el('span', 'kicker', 'Topic'));
+        wrap.append(el('p', 'subject', e.name));
+        if ((e.aliases || []).length) {
+          const tags = el('div', 'tags');
+          e.aliases.forEach((a) => tags.append(el('span', 'tag', a)));
+          wrap.append(tags);
+        }
+        if (e.facts < LINKING_MIN_FACTS) {
+          wrap.append(el('p', 'lede', 'Carries a single fact, so it links nothing to anything. The graph hides these unless asked.'));
+        }
+        const group = el('div', 'group');
+        group.append(el('span', 'kicker', `${plural(e.facts, 'fact', 'facts')}`));
+        const facts = state.facts.filter((f) => (f.entities || []).includes(e.id));
+        if (!facts.length) {
+          group.append(el('p', 'nothing', `The store counts ${e.facts} for this topic but returned none — the mention rows and the fact rows disagree.`));
+        }
+        facts.forEach((f) => group.append(miniItem(
+          f.content,
+          `${fmtTrust(f.trust)} trust · ${f.category} · ${f.retrievals ? `served ${f.retrievals}×` : 'never served'}`,
+          () => select(factKey(f.id)),
+        )));
+        wrap.append(group);
+        return wrap;
+      }
+
+      // ── selection ────────────────────────────────────────────────────────
       function select(key) {
         const opening = state.selected !== key;
         state.selected = opening ? key : null;
-        if (opening) centreOn(key); else fitAll();
-        draw();
+        state.expanded = false;
+        if (state.mode === 'graph') {
+          if (opening) centreOn(key); else fitAll();
+          draw();
+        }
         renderSide();
+        markCurrent();
+        // Drives the phone's pane weighting only (see the 640px block): with a
+        // subject open the inspector is what the operator is reading.
+        $('stage').classList.toggle('has-subject', !!state.selected);
+      }
+
+      // The list marks its own selection rather than being rebuilt: re-rendering
+      // 104 rows on every click loses the scroll position, which is the one thing
+      // an operator working down a list cannot afford to lose.
+      function markCurrent() {
+        const rows = $('rows').children;
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (row.setAttribute) row.setAttribute('aria-current', 'false');
+        }
+        const { kind, rows: subjects } = visible();
+        for (let i = 0; i < subjects.length && i < rows.length; i++) {
+          const key = kind === 'topics' ? entityKey(subjects[i].id) : factKey(subjects[i].id);
+          if (key === state.selected && rows[i].setAttribute) rows[i].setAttribute('aria-current', 'true');
+        }
       }
 
       // Focus means "show me this and what it touches", so the view frames the
@@ -700,8 +1507,7 @@
       function centreOn(key) {
         const node = state.byId.get(key);
         if (!node) return;
-        const near = neighbours(key);
-        const group = [node, ...state.nodes.filter((n) => near.has(n.key))];
+        const group = [node, ...state.nodes.filter((n) => neighbours(key).has(n.key))];
         const box = $('graph').getBoundingClientRect();
         const width = box.width || 900, height = box.height || 560;
         const xs = group.map((n) => n.x), ys = group.map((n) => n.y);
@@ -724,66 +1530,232 @@
         fit(box.width || 900, box.height || 560);
       }
 
-      function renderAll() {
-        renderCounts();
-        renderWarning();
-        draw();
-        renderSide();
+      // ── modes ────────────────────────────────────────────────────────────
+      function applyMode() {
+        const graph = state.mode === 'graph';
+        $('graphPane').hidden = !graph;
+        $('listPane').hidden = graph;
+        $('stage').classList.toggle('is-graph', graph);
+        $('modeList').setAttribute('aria-selected', String(!graph));
+        $('modeGraph').setAttribute('aria-selected', String(graph));
+        if (graph) {
+          // The canvas had zero size while hidden, so anything measured before
+          // now framed the graph to a 0x0 box. Re-frame on reveal, never
+          // re-layout: positions are a function of the data, not of the box.
+          //
+          // And carry the subject across. An operator who found a fact in the
+          // list and switched to the graph is asking "where does this sit" — so
+          // the reveal frames that fact and its neighbours rather than dropping
+          // them at a whole-graph fit with a highlighted dot to hunt for. Only
+          // if the canvas is actually drawing it: a single-fact topic is not a
+          // node while the linking filter is on.
+          if (state.selected && state.byId.has(state.selected)) centreOn(state.selected);
+          else fitAll();
+          draw();
+        }
       }
 
-      // ── interaction ──────────────────────────────────────────────────
+      function setMode(mode) {
+        if (state.mode === mode) return;
+        state.mode = mode;
+        applyMode();
+      }
+
+      function setGraphTopics(which) {
+        state.graphTopics = which;
+        buildModel();
+        const box = $('graph').getBoundingClientRect();
+        layout(box.width || 900, box.height || 560);
+        fitAll();
+        draw();
+        // A selection can survive into a model that no longer draws it; the
+        // inspector still resolves it from state.facts / state.entities.
+        renderSide();
+        renderList();
+        renderTally();
+      }
+
+      function renderAll() {
+        renderScopes();
+        renderSort();
+        renderTally();
+        renderNotice();
+        renderList();
+        renderSide();
+        if (state.mode === 'graph') draw(); else renderLegend();
+      }
+
+      // Coarse pointer, the same test the host uses to decide its own touch
+      // affordances. Not a width check: a small window on a desktop still has a
+      // mouse, and a large tablet still has fingers.
+      function isTouch() {
+        try { return matchMedia('(hover:none) and (pointer:coarse)').matches; } catch (_) { return false; }
+      }
+
+      // ── interaction ──────────────────────────────────────────────────────
+      //
+      // Pointer events, not mouse events. This was mousedown/mousemove/mouseup
+      // plus wheel, which means that on a phone — where this panel is reachable
+      // from the drawer — the graph could not be panned OR zoomed at all: no touch
+      // listener existed, and with no touch-action the browser treated a drag on
+      // the SVG as a page scroll. One pointer code path covers mouse, touch and
+      // pen; pinch needs its own two-finger arithmetic on top.
       function wire() {
         const svg = $('graph');
-        let dragging = false, lastX = 0, lastY = 0;
-        svg.addEventListener('mousedown', (e) => {
-          dragging = true; lastX = e.clientX; lastY = e.clientY;
+        // Active pointers by id, so a second finger is a pinch rather than a
+        // second pan fighting the first.
+        const touches = new Map();
+        let pinch = null;      // { distance, k, cx, cy } captured when the 2nd finger lands
+        let panning = false, lastX = 0, lastY = 0, moved = 0;
+
+        const localPoint = (event) => {
+          const box = svg.getBoundingClientRect();
+          return { x: event.clientX - box.left, y: event.clientY - box.top };
+        };
+        const spread = () => {
+          const [a, b] = [...touches.values()];
+          return Math.hypot(a.x - b.x, a.y - b.y);
+        };
+        const midpoint = () => {
+          const [a, b] = [...touches.values()];
+          const box = svg.getBoundingClientRect();
+          return { x: (a.x + b.x) / 2 - box.left, y: (a.y + b.y) / 2 - box.top };
+        };
+
+        svg.addEventListener('pointerdown', (event) => {
+          touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          if (touches.size === 2) {
+            // Second finger: stop panning, start pinching from the current scale.
+            panning = false;
+            svg.classList.remove('dragging');
+            pinch = { distance: spread(), k: state.view.k, ...midpoint() };
+            return;
+          }
+          if (touches.size > 2) return;
+          panning = true; moved = 0;
+          lastX = event.clientX; lastY = event.clientY;
           svg.classList.add('dragging');
+          // Capture so a drag that leaves the SVG still pans, and so the pointer
+          // cannot be stolen mid-gesture by an element underneath.
+          try { svg.setPointerCapture(event.pointerId); } catch (_) { /* not fatal */ }
         });
-        window.addEventListener('mouseup', () => { dragging = false; svg.classList.remove('dragging'); });
-        window.addEventListener('mousemove', (e) => {
-          if (!dragging) return;
-          state.view.x += e.clientX - lastX;
-          state.view.y += e.clientY - lastY;
-          lastX = e.clientX; lastY = e.clientY;
+
+        svg.addEventListener('pointermove', (event) => {
+          if (!touches.has(event.pointerId)) return;
+          touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+          if (pinch && touches.size >= 2) {
+            const distance = spread();
+            if (distance > 0 && pinch.distance > 0) {
+              // Zoom about the midpoint of the two fingers, so the point between
+              // them stays put — the behaviour every map has.
+              zoomTo(pinch.k * (distance / pinch.distance), pinch.x, pinch.y);
+            }
+            return;
+          }
+          if (!panning) return;
+          const dx = event.clientX - lastX, dy = event.clientY - lastY;
+          moved += Math.abs(dx) + Math.abs(dy);
+          state.view.x += dx;
+          state.view.y += dy;
+          lastX = event.clientX; lastY = event.clientY;
           draw();
         });
-        svg.addEventListener('wheel', (e) => {
-          e.preventDefault();
-          zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.offsetX, e.offsetY);
+
+        const endPointer = (event) => {
+          const wasPanning = panning;
+          touches.delete(event.pointerId);
+          if (touches.size < 2) pinch = null;
+          if (touches.size === 0) {
+            panning = false;
+            svg.classList.remove('dragging');
+            // A tap on empty canvas clears the focus; a drag must not. 8px of
+            // slop, because a finger never holds perfectly still.
+            if (wasPanning && moved < 8 && state.selected) select(state.selected);
+          } else if (wasPanning) {
+            // One finger lifted from a pinch: re-anchor the remaining one so the
+            // graph does not jump.
+            const [remaining] = [...touches.values()];
+            lastX = remaining.x; lastY = remaining.y;
+          }
+        };
+        svg.addEventListener('pointerup', endPointer);
+        svg.addEventListener('pointercancel', endPointer);
+
+        svg.addEventListener('wheel', (event) => {
+          event.preventDefault();
+          const point = localPoint(event);
+          zoomAt(event.deltaY < 0 ? 1.12 : 1 / 1.12, point.x, point.y);
         }, { passive: false });
-        svg.addEventListener('click', () => { if (state.selected) select(state.selected); });
 
         $('zoomIn').addEventListener('click', () => zoomAt(1.2));
         $('zoomOut').addEventListener('click', () => zoomAt(1 / 1.2));
         $('zoomFit').addEventListener('click', () => { fitAll(); draw(); });
+        $('graphScope').addEventListener('click', () => {
+          setGraphTopics(state.graphTopics === 'linking' ? 'all' : 'linking');
+        });
+        $('modeList').addEventListener('click', () => setMode('list'));
+        $('modeGraph').addEventListener('click', () => setMode('graph'));
+        $('sort').addEventListener('change', (e) => {
+          state.sort = e.target.value;
+          renderList(); markCurrent();
+        });
         $('search').addEventListener('input', (e) => {
           state.query = e.target.value;
-          draw();
+          renderList(); renderTally(); markCurrent();
+          if (state.mode === 'graph') draw();
         });
         // Escape clears the focus: an operator must always have one key that
         // returns them to the whole picture.
         window.addEventListener('keydown', (e) => {
           if (e.key === 'Escape' && state.selected) select(state.selected);
         });
+        // Resize is not one event. Rotating a phone, the address bar collapsing on
+        // scroll, and the on-screen keyboard opening all fire it — iOS fires a
+        // burst of them for a single rotation. This handler ran the FULL layout
+        // each time: 420 iterations of an O(n^2) repulsion pass, on the main
+        // thread.
+        //
+        // Worse than the cost: layout() re-seeds every position from the new
+        // viewport, so an operator who had panned to a corner and opened the
+        // keyboard came back to a different graph. The positions are not a
+        // function of the viewport and should not be recomputed from it.
+        //
+        // So: debounce, and re-fit rather than re-layout. A refit keeps the
+        // constellation and just frames it for the new box, which is what the
+        // operator expects from a rotation. The graph is only laid out again when
+        // its DATA or its node set changes — load() and setGraphTopics().
+        let resizeTimer = null;
         window.addEventListener('resize', () => {
-          const box = svg.getBoundingClientRect();
-          layout(box.width || 900, box.height || 560);
-          fit(box.width || 900, box.height || 560);
-          draw();
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            resizeTimer = null;
+            const box = svg.getBoundingClientRect();
+            fit(box.width || 900, box.height || 560);
+            draw();
+          }, 150);
         });
       }
 
-      function zoomAt(factor, ox, oy) {
-        const svg = $('graph');
-        const box = svg.getBoundingClientRect();
-        const cx = ox === undefined ? (box.width || 900) / 2 : ox;
-        const cy = oy === undefined ? (box.height || 560) / 2 : oy;
-        const k = Math.max(0.25, Math.min(4, state.view.k * factor));
-        // Keep the point under the cursor fixed while scaling.
+      // Scale to an absolute k about a fixed point. Pinch needs absolute rather
+      // than relative scaling: a factor accumulated per move event drifts, while
+      // "this much spread means this much zoom, measured from where the fingers
+      // landed" does not.
+      function zoomTo(target, cx, cy) {
+        const k = clampScale(target);
+        if (k === state.view.k) return;
         state.view.x = cx - (cx - state.view.x) * (k / state.view.k);
         state.view.y = cy - (cy - state.view.y) * (k / state.view.k);
         state.view.k = k;
         draw();
+      }
+
+      function zoomAt(factor, ox, oy) {
+        const box = $('graph').getBoundingClientRect();
+        const cx = ox === undefined ? (box.width || 900) / 2 : ox;
+        const cy = oy === undefined ? (box.height || 560) / 2 : oy;
+        // Keep the point under the cursor fixed while scaling.
+        zoomTo(state.view.k * factor, cx, cy);
       }
 
       async function load() {
@@ -799,6 +1771,7 @@
         state.entities = d.entities || [];
         state.edges = d.edges || [];
         state.stats = d.stats || null;
+        state.isolatedIds = d.isolated_facts || [];
         state.error = null;
         state.loading = false;
         buildModel();
@@ -806,15 +1779,26 @@
         layout(box.width || 900, box.height || 560);
         fitAll();
         renderAll();
+        // The one authored moment, on the one transition that is not instant:
+        // an empty console becoming a full one. Never on a filter, a sort or a
+        // selection.
+        if (!state.entered) {
+          state.entered = true;
+          $('stage').classList.add('enter');
+        }
       }
 
       globalThis.__memory = {
-        state, buildModel, layout, fit, fitAll, centreOn, draw, select, renderSide, renderCounts,
-        renderWarning, matches, neighbours, trustBand, shortLabel, factKey,
-        entityKey, zoomAt, csrf, call, load,
+        state, buildModel, layout, fit, fitAll, centreOn, draw, select, renderSide,
+        renderScopes, renderSort, renderTally, renderNotice, renderList, renderLegend,
+        renderAll, matches, matchesFact, matchesEntity, visible, neighbours, trustBand,
+        trustWhy, shortLabel, factKey, entityKey, zoomAt, zoomTo, clampScale, csrf,
+        call, load, setMode, applyMode, setGraphTopics, topicsOf, degreeOf, markCurrent,
+        SCOPES, SORTS, TRUST_DEFAULT, TRUST_FLOOR, LINKING_MIN_FACTS,
       };
 
       wire();
+      applyMode();
       renderAll();
       load();
     })();
