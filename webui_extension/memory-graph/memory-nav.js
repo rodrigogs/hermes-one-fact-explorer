@@ -17,7 +17,7 @@
   // session cookie at all.
   //
   // Navigation and visibility come from the shared HermesPanelNav; see
-  // hermes-panel/hermes-panel-nav.js for what that fixes and why.
+  // hermes-one-extension-kit/hermes-panel-nav.js for what that fixes and why.
   const EXT_ID = 'memory-graph';
   const SIDE = `/api/extensions/${EXT_ID}/sidecar`;
   const PANEL_ID = 'memory-graph-panel';
@@ -90,8 +90,8 @@
   }
 
   if (!window.HermesPanelNav) {
-    console.error('[memory-graph] hermes-panel extension did not load; the Graph '
-      + 'button cannot be installed. Check that "hermes-panel" is listed BEFORE '
+    console.error('[memory-graph] Hermes One Extension Kit did not load; the Graph '
+      + 'button cannot be installed. Check that "hermes-one-extension-kit" is listed BEFORE '
       + '"memory-graph" in extensions.json.');
     return;
   }
