@@ -28,7 +28,7 @@ endpoint.
 ```bash
 python3 -m pytest -q
 node --test tests/*.js
-node --check webui_extension/memory-graph/memory-nav.js
+node --check webui_extension/hermes-one-fact-explorer/memory-nav.js
 ```
 
 ## Runtime safety

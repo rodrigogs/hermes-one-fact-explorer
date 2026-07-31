@@ -50,7 +50,7 @@ def resolve_store_path() -> Path:
 def resolve_token_path() -> Path:
     home = os.environ.get("HERMES_HOME")
     base = Path(home) if home else Path.home() / ".hermes"
-    return base / "webui" / "sidecar-auth" / "memory-graph.token"
+    return base / "webui" / "sidecar-auth" / "hermes-one-fact-explorer.token"
 
 
 def _error(status: int, message: str) -> Tuple[int, Dict[str, Any]]:
@@ -153,7 +153,7 @@ class MemorySidecarApp:
 
 
 def default_console_path() -> Path:
-    return Path(__file__).resolve().parent.parent / "webui_extension" / "memory-graph" / "console.html"
+    return Path(__file__).resolve().parent.parent / "webui_extension" / "hermes-one-fact-explorer" / "console.html"
 
 
 class _Handler(BaseHTTPRequestHandler):

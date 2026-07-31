@@ -15,7 +15,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
 
-const CONSOLE = 'webui_extension/memory-graph/console.html';
+const CONSOLE = 'webui_extension/hermes-one-fact-explorer/console.html';
 const html = () => fs.readFileSync(CONSOLE, 'utf8');
 
 function styleBlock() {

@@ -1,6 +1,6 @@
 {
-  "id": "memory-graph",
-  "name": "Memory Graph",
+  "id": "hermes-one-fact-explorer",
+  "name": "Fact Explorer",
   "scripts": ["memory-nav.js"],
   "stylesheets": ["memory-nav.css"],
   "sidecar": {

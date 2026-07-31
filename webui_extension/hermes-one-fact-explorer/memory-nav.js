@@ -18,9 +18,9 @@
   //
   // Navigation and visibility come from the shared HermesPanelNav; see
   // hermes-one-extension-kit/hermes-panel-nav.js for what that fixes and why.
-  const EXT_ID = 'memory-graph';
+  const EXT_ID = 'hermes-one-fact-explorer';
   const SIDE = `/api/extensions/${EXT_ID}/sidecar`;
-  const PANEL_ID = 'memory-graph-panel';
+  const PANEL_ID = 'hermes-one-fact-explorer-panel';
   const ICON = '<circle cx="12" cy="5" r="2.4"/><circle cx="5" cy="17" r="2.4"/>'
     + '<circle cx="19" cy="17" r="2.4"/><path d="M10.4 6.8 6.6 14.9"/>'
     + '<path d="M13.6 6.8l3.8 8.1"/><path d="M7.4 17h9.2"/>';
@@ -37,7 +37,7 @@
   function ensurePanel() {
     let panel = document.getElementById(PANEL_ID);
     if (panel) return panel;
-    panel = el('section', 'main-view hermes-panel memory-graph-panel');
+    panel = el('section', 'main-view hermes-panel hermes-one-fact-explorer-panel');
     panel.id = PANEL_ID;
     // srcdoc, not src: the sidecar refuses to be framed by URL, and srcdoc
     // inherits this document's origin so the proxy call carries the cookie.
@@ -90,9 +90,9 @@
   }
 
   if (!window.HermesPanelNav) {
-    console.error('[memory-graph] Hermes One Extension Kit did not load; the Graph '
+    console.error('[hermes-one-fact-explorer] Hermes One Extension Kit did not load; the Graph '
       + 'button cannot be installed. Check that "hermes-one-extension-kit" is listed BEFORE '
-      + '"memory-graph" in extensions.json.');
+      + '"hermes-one-fact-explorer" in extensions.json.');
     return;
   }
 
@@ -102,10 +102,10 @@
     // same list, and two buttons reading Memory that open different screens is a
     // guess the operator has to make every time. The tooltip carries the full
     // name.
-    label: 'Graph',
-    title: 'Memory graph',
+    label: 'Facts',
+    title: 'Fact Explorer',
     iconPath: ICON,
-    navClass: 'memory-graph-nav',
+    navClass: 'hermes-one-fact-explorer-nav',
     onOpen,
     // Beside the host's own Memory tab, because that is where someone looking for
     // what the agent knows will look. Previously this landed after Settings while

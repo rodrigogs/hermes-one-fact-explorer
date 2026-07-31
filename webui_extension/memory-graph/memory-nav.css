@@ -1,5 +1,0 @@
-.memory-graph-nav{color:var(--muted)}
-.memory-graph-nav:hover{color:var(--text);background:rgba(255,255,255,.06)}
-.memory-graph-nav-label{display:none}
-.sidebar-nav .memory-graph-nav-label{display:inline}
-@media(max-width:900px){.sidebar-nav .memory-graph-nav-label{display:none}}
