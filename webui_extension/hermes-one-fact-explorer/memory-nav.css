@@ -3,3 +3,67 @@
 .hermes-one-fact-explorer-nav-label{display:none}
 .sidebar-nav .hermes-one-fact-explorer-nav-label{display:inline}
 @media(max-width:900px){.sidebar-nav .hermes-one-fact-explorer-nav-label{display:none}}
+
+/* ── the console's view modes, as the shell's sidebar ────────────────────────
+   The Office's shape. The panel head mirrors the host's own .panel-head, measured
+   off the running shell — 11px/600 uppercase at .08em in --muted, 41px min-height,
+   one hairline below — so this column and the conversation list read as one system.
+
+   HOST tokens only: this stylesheet loads in the host document, where the panel
+   tokens do not exist. Measured live, the shell defines --bg, --text, --muted and
+   --accent; --font-sans and --font-mono it does NOT, so type inherits. */
+.sidebar .panel-view[data-panel-token="memory"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar .panel-view[data-panel-token="memory"] .panel-head {
+  min-height: 41px;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--muted) 28%, transparent);
+  color: var(--muted);
+  font: 600 11px/1.3 inherit;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.facts-modes { display: flex; flex-direction: column; padding: 8px; gap: 2px; }
+.facts-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: 500 13px/1.35 inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.facts-mode:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.facts-mode.is-on {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+/* What the store holds, read from the console's own tally so there is one count. */
+.facts-tally {
+  margin: 0;
+  padding: 4px 18px 12px;
+  color: var(--muted);
+  font: 400 12px/1.4 inherit;
+}
+@media (hover: none) and (pointer: coarse) {
+  .facts-mode { min-height: 44px; }
+}
+
+/* The console's modes fill this track now, so the 1px line between the panel and
+   the rail is a seam the real sidebar never has. Bounded at the host's own collapse
+   breakpoint: below it the rail is gone and this sidebar IS the navigation. */
+@media (min-width: 641px) {
+  .layout:has(> main.main.showing-x-memory) > .sidebar:not(.mobile-open) {
+    border-right-width: 0;
+  }
+}

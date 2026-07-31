@@ -503,7 +503,16 @@
       .search { min-height: 44px; }
       input, textarea, select { font-size: max(16px, 1em); }
     }
-  </style>
+  
+    /* ── embedded in the shell's panel ───────────────────────────────────────
+       The rail icon is lit and labelled Fact Explorer and the console's two view
+       modes are the shell's sidebar now, so the 43px masthead repeated both. The
+       head itself goes with them: unlike the router's, it carried only the title
+       and the mode switch, and the search lives in .bar below. Both stay in the
+       DOM — the sidebar clicks #modeList / #modeGraph and reads their
+       aria-selected — they are just not drawn twice. */
+    .is-embedded .head { display: none; }
+</style>
 </head>
 <body>
   <div class="shell">
@@ -550,6 +559,10 @@
   </div>
 
   <script>
+    /* True inside the shell's panel iframe; the host owns the chrome there. */
+    try {
+      if (window.self !== window.top) document.documentElement.classList.add('is-embedded');
+    } catch (error) { document.documentElement.classList.add('is-embedded'); }
     (() => {
       'use strict';
 
