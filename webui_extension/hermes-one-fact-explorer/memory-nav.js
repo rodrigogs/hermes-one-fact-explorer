@@ -133,7 +133,7 @@
   }
 
   function selectMode(id) {
-    const frame = document.querySelector('[data-console-frame]');
+    const frame = document.querySelector('.hermes-one-fact-explorer-panel [data-console-frame]');
     try {
       const doc = frame && frame.contentDocument;
       const button = doc && doc.getElementById(id);
@@ -147,7 +147,7 @@
   /** Mirror aria-selected from the console's mode buttons onto the sidebar rows. */
   function syncModes() {
     if (!sideNav) return;
-    const frame = document.querySelector('[data-console-frame]');
+    const frame = document.querySelector('.hermes-one-fact-explorer-panel [data-console-frame]');
     let doc = null;
     try { doc = frame && frame.contentDocument; } catch (error) { return; }
     for (const row of sideNav.querySelectorAll('.facts-mode')) {
@@ -168,7 +168,7 @@
 
   /** Re-mirror once the console document exists; buildSidebar runs before it does. */
   function watchModes() {
-    const frame = document.querySelector('[data-console-frame]');
+    const frame = document.querySelector('.hermes-one-fact-explorer-panel [data-console-frame]');
     if (!frame) return;
     let doc = null;
     try { doc = frame.contentDocument; } catch (error) { return; }
