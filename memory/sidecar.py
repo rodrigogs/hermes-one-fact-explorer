@@ -41,7 +41,9 @@ def resolve_store_path() -> Path:
     base = Path(home) if home else Path.home() / ".hermes"
     if base.parent.name == "profiles":
         return base / "memory_store.db"
-    profile = os.environ.get("HERMES_PROFILE", "rodrigo")
+    profile = os.environ.get("HERMES_PROFILE", "")
+    if not profile:
+        return base / "memory_store.db"
     return base / "profiles" / profile / "memory_store.db"
 
 
