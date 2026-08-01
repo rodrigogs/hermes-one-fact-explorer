@@ -21,11 +21,17 @@
   min-height: 0;
 }
 .sidebar .panel-view[data-panel-token="memory"] .panel-head {
+  /* Longhands, not the font shorthand: `font: 600 11px/1.3 inherit` is a parse
+     error (the shorthand needs a family, and inherit is only valid as the whole
+     value), so the declaration was dropped and these rows rendered at the UA
+     default instead. The family is deliberately not set: it inherits. */
   min-height: 41px;
   padding: 8px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--muted) 28%, transparent);
   color: var(--muted);
-  font: 600 11px/1.3 inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
   text-transform: uppercase;
   letter-spacing: .08em;
   display: flex;
@@ -42,7 +48,9 @@
   border-radius: 8px;
   background: none;
   color: var(--text);
-  font: 500 13px/1.35 inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
   text-align: left;
   cursor: pointer;
 }
@@ -56,7 +64,9 @@
   margin: 0;
   padding: 4px 18px 12px;
   color: var(--muted);
-  font: 400 12px/1.4 inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
 }
 @media (hover: none) and (pointer: coarse) {
   .facts-mode { min-height: 44px; }
