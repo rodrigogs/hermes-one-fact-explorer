@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, urlparse
 from .graph import build_graph
 from .store_reader import MemoryStoreReader, StoreUnavailable
 
+EXTENSION_ID = "hermes-one-fact-explorer"
 DEFAULT_PORT = 8792
 _TOKEN_HEADER = "X-Hermes-Sidecar-Token"
 
@@ -128,7 +129,14 @@ class MemorySidecarApp:
             return _error(404, "unknown route")
 
         if route == "/health":
-            return 200, {"ok": True, "store": str(self._reader.path),
+            # No absolute path here. /health is auth-exempt by design - a liveness
+            # probe must answer before a token is available - so everything it
+            # returns is readable by any caller that can reach the port. The store
+            # path is the operator's home directory and the store's filename:
+            # deployment recon a liveness probe never needs, and the one field here
+            # that says something about the host rather than about the service.
+            # Whether the store exists is the liveness answer and stays.
+            return 200, {"ok": True, "service": EXTENSION_ID,
                          "present": self._reader.path.exists()}
 
         if not self._authorised(headers):

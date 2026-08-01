@@ -73,6 +73,24 @@ def test_health_is_exempt_because_it_carries_no_memory(app):
     assert "facts" not in body
 
 
+def test_health_does_not_leak_the_store_path(app):
+    """/health answers before a token exists, so it must say nothing about the host.
+
+    It used to return the store's absolute path, which is the operator's home
+    directory and the store filename - deployment recon, readable by anything that
+    could reach the port, from an endpoint whose whole purpose is to answer "am I
+    up". Liveness is `present`; the path is not part of the question.
+    """
+    status, body = app.dispatch("GET", "/health", {})
+    assert status == 200
+    assert "store" not in body, f"/health leaks the store path: {body}"
+    flat = " ".join(str(v) for v in body.values())
+    assert "/home/" not in flat and "\\Users\\" not in flat, flat
+    assert ".db" not in flat, flat
+    # Liveness itself is still answered.
+    assert "present" in body
+
+
 def test_the_surface_is_read_only_whatever_the_caller_asks(app):
     """No verb here may mutate the agent's knowledge — a browser bug must not be
     able to delete something learned weeks ago."""
