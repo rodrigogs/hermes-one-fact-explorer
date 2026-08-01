@@ -12,7 +12,10 @@
    HOST tokens only: this stylesheet loads in the host document, where the panel
    tokens do not exist. Measured live, the shell defines --bg, --text, --muted and
    --accent; --font-sans and --font-mono it does NOT, so type inherits. */
-.sidebar .panel-view[data-panel-token="memory"] {
+/* .active is the host's own switch for "show exactly one panel-view". Setting
+   display unconditionally outranked it and stacked both extension sidebars in
+   the column at once — measured, router and memory both 431px tall together. */
+.sidebar .panel-view[data-panel-token="memory"].active {
   display: flex;
   flex-direction: column;
   min-height: 0;

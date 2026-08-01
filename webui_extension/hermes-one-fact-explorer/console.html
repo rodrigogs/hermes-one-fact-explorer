@@ -511,7 +511,24 @@
        and the mode switch, and the search lives in .bar below. Both stay in the
        DOM — the sidebar clicks #modeList / #modeGraph and reads their
        aria-selected — they are just not drawn twice. */
-    .is-embedded .head { display: none; }
+    /* Same treatment as the router: match the sidebar's .panel-head rather than hiding
+       the head outright, so the search row below it keeps a header to sit under and the
+       two columns line up at the same 41px. */
+    .is-embedded .head {
+      min-height: 41px;
+      padding: 8px 16px;
+      align-items: center;
+    }
+    .is-embedded .head-title {
+      font: 600 var(--t-label)/1.3 var(--sans);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .is-embedded .modes { display: none; }
+    /* Same content-height cap as the router, for the same reason. */
+    .is-embedded .head > .head-actions { min-height: 0; }
+    .is-embedded .head .btn { min-height: 25px; padding-top: 2px; padding-bottom: 2px; font-size: var(--t-label); }
 </style>
 </head>
 <body>
